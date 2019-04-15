@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  roles:
+  - { role: huaweicloud_ansible_modules }
+  tasks:
+    - debug:
+        msg: "{{resource_group}} {{test}}"
+
+    - include_tasks: "{{test}}"
