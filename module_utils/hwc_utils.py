@@ -307,7 +307,8 @@ class DictComparison(object):
         These are dictionaries of arbitrary depth, but made up of standard
         Python types only.
         This differ will compare all values in `a` to those in `b`.
-        Note: Only keys in `a` will be compared. Extra keys in `b` will be ignored.
+        If value in `a` is None, always returns True, indicating
+        this value is no need to compare.
         Note: On all lists, order does matter.
     '''
 
@@ -321,43 +322,56 @@ class DictComparison(object):
         return not self.__eq__(other)
 
     def _compare_dicts(self, dict1, dict2):
-        if len(dict1.keys()) != len(dict2.keys()):
+        if dict1 is None:
+            return True
+
+        if set(dict1.keys()) != set(dict2.keys()):
             return False
 
-        return all([
-            self._compare_value(dict1.get(k), dict2.get(k)) for k in dict1
-        ])
+        for k in dict1:
+            if not self._compare_value(dict1.get(k), dict2.get(k)):
+                return False
+
+        return True
 
     def _compare_lists(self, list1, list2):
         """Takes in two lists and compares them."""
+        if list1 is None:
+            return True
+
         if len(list1) != len(list2):
             return False
 
-        difference = []
-        for index in range(len(list1)):
-            value1 = list1[index]
-            if index < len(list2):
-                value2 = list2[index]
-                difference.append(self._compare_value(value1, value2))
+        for i in range(len(list1)):
+            if not self._compare_value(list1[i], list2[i]):
+                return False
 
-        return all(difference)
+        return True
 
     def _compare_value(self, value1, value2):
         """
         return: True: value1 is same as value2, otherwise False.
         """
+        if value1 is None:
+            return True
+
         if not (value1 and value2):
             return (not value1) and (not value2)
 
         # Can assume non-None types at this point.
-        if isinstance(value1, list):
+        if isinstance(value1, list) and isinstance(value2, list):
             return self._compare_lists(value1, value2)
-        elif isinstance(value1, dict):
+
+        elif isinstance(value1, dict) and isinstance(value2, dict):
             return self._compare_dicts(value1, value2)
-        # Always use to_text values to avoid unicode issues.
-        else:
-            return (to_text(value1, errors='surrogate_or_strict')
-                    == to_text(value2, errors='surrogate_or_strict'))
+
+        try:
+            # Always use to_text values to avoid unicode issues.
+            # to_text may throw UnicodeErrors. These errors shouldn't crash
+            # Ansible and return False as default.
+            return to_text(value1) == to_text(value2)
+        except (UnicodeError, Exception):
+            return False
 
 
 class _DictClean(object):
