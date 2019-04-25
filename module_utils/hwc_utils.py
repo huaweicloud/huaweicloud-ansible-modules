@@ -75,6 +75,11 @@ def are_dicts_different(expect, actual):
     return DictComparison(expect_vals) != DictComparison(actual_vals)
 
 
+class HwcModuleException(Exception):
+    def __str__(self):
+        return "[HwcClientException] message=%s" % self.message
+
+
 class HwcClientException(Exception):
     def __init__(self, code, message):
         super(HwcClientException, self).__init__()
@@ -385,6 +390,42 @@ class _DictClean(object):
             if self.keep_it(v1):
                 r.append(v1)
         return r
+
+
+def navigate_value(data, index, array_index=None):
+    if array_index and (not isinstance(array_index, dict)):
+        raise HwcModuleException("array_index must be dict")
+
+    d = data
+    for n in range(len(index)):
+        if not isinstance(d, dict):
+            raise HwcModuleException(
+                "can't navigate value from a non-dict object")
+
+        i = index[n]
+        if i not in d:
+            raise HwcModuleException(
+                "navigate value failed: key(%s) is not exist in dict" % i)
+        d = d[i]
+
+        if not array_index:
+            continue
+
+        k = ".".join(index[: (n + 1)])
+        if k not in array_index:
+            continue
+
+        if not isinstance(d, list):
+            raise HwcModuleException(
+                "can't navigate value from a non-list object")
+
+        j = array_index.get(k)
+        if j >= len(d):
+            raise HwcModuleException(
+                "navigate value failed: the index is out of list")
+        d = d[j]
+
+    return d
 
 
 def build_path(module, path, kv=None):
