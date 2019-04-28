@@ -109,13 +109,11 @@ RETURN = '''
 # Imports
 ###############################################################################
 
-from ansible.module_utils.hwc_utils import (Config, HwcModule, get_region,
-                                            HwcClientException, navigate_value,
-                                            HwcClientException404,
-                                            wait_to_finish,
-                                            remove_nones_from_dict, build_path,
-                                            remove_empty_from_dict,
-                                            are_dicts_different)
+from ansible.module_utils.hwc_utils import (Config, HwcClientException,
+                                            HwcClientException404, HwcModule,
+                                            are_different_dicts, is_empty_value,
+                                            wait_to_finish, get_region,
+                                            build_path, navigate_value)
 import re
 
 ###############################################################################
@@ -128,7 +126,8 @@ def main():
 
     module = HwcModule(
         argument_spec=dict(
-            state=dict(default='present', choices=['present', 'absent'], type='str'),
+            state=dict(
+                default='present', choices=['present', 'absent'], type='str'),
             name=dict(required=True, type='str'),
             cidr=dict(required=True, type='str')
         ),
@@ -155,7 +154,8 @@ def main():
         if state == 'present':
             expect = _get_editable_properties(module)
             current_state = response_to_hash(module, fetch)
-            if are_dicts_different(expect, current_state):
+            current = {"cidr": current_state["cidr"]}
+            if are_different_dicts(expect, current):
                 if not module.check_mode:
                     fetch = update(config, self_link(module))
                     fetch = response_to_hash(module, fetch.get('vpc'))
@@ -271,7 +271,8 @@ def get_id_by_name(config):
         elif len(ids) == 1:
             return ids[0]
         else:
-            module.fail_json(msg="Multiple resources with same name are found.")
+            module.fail_json(
+                msg="Multiple resources with same name are found.")
     elif none_values:
         module.fail_json(
             msg="Can not find id by name because url includes None.")
@@ -306,28 +307,43 @@ def self_link(module):
 
 
 def resource_to_create(module):
-    request = remove_empty_from_dict({
-        u'name': module.params.get('name'),
-        u'cidr': module.params.get('cidr')
-    })
-    return {'vpc': request}
+    params = dict()
+
+    v = module.params.get('cidr')
+    if not is_empty_value(v):
+        params["cidr"] = v
+
+    v = module.params.get('name')
+    if not is_empty_value(v):
+        params["name"] = v
+
+    if not params:
+        return params
+
+    params = {"vpc": params}
+
+    return params
 
 
 def resource_to_update(module):
-    request = remove_nones_from_dict({
-        u'name': module.params.get('name'),
-        u'cidr': module.params.get('cidr')
-    })
-    return {'vpc': request}
+    params = dict()
+
+    v = module.params.get('cidr')
+    if not is_empty_value(v):
+        params["cidr"] = v
+
+    if not params:
+        return params
+
+    params = {"vpc": params}
+
+    return params
 
 
 def _get_editable_properties(module):
-    request = remove_nones_from_dict({
-        "name": module.params.get("name"),
+    return {
         "cidr": module.params.get("cidr"),
-    })
-
-    return request
+    }
 
 
 def response_to_hash(module, response):
@@ -339,7 +355,8 @@ def response_to_hash(module, response):
         u'name': response.get(u'name'),
         u'cidr': response.get(u'cidr'),
         u'status': response.get(u'status'),
-        u'routes': VpcRoutesArray(response.get(u'routes', []), module).from_response(),
+        u'routes': VpcRoutesArray(
+            response.get(u'routes', []), module).from_response(),
         u'enable_shared_snat': response.get(u'enable_shared_snat')
     }
 

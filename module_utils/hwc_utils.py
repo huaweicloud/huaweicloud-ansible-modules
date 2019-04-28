@@ -21,61 +21,6 @@ from ansible.module_utils.basic import (AnsibleModule, env_fallback,
 from ansible.module_utils._text import to_text
 
 
-def navigate_hash(source, path, default=None):
-    if not (source and path):
-        return None
-
-    key = path[0]
-    path = path[1:]
-    if key not in source:
-        return default
-    result = source[key]
-    if path:
-        return navigate_hash(result, path, default)
-    else:
-        return result
-
-
-def remove_empty_from_dict(obj):
-    return _DictClean(
-        obj,
-        lambda v: v is not None and v != {} and v != []
-    )()
-
-
-def remove_nones_from_dict(obj):
-    return _DictClean(obj, lambda v: v is not None)()
-
-
-def replace_resource_dict(item, value):
-    """ Handles the replacement of dicts with values ->
-    the needed value for HWC API"""
-    if isinstance(item, list):
-        items = []
-        for i in item:
-            items.append(replace_resource_dict(i, value))
-        return items
-    else:
-        if not item:
-            return item
-        return item.get(value)
-
-
-def are_dicts_different(expect, actual):
-    """Remove all output-only from actual."""
-    actual_vals = {}
-    for k, v in actual.items():
-        if k in expect:
-            actual_vals[k] = v
-
-    expect_vals = {}
-    for k, v in expect.items():
-        if k in actual:
-            expect_vals[k] = v
-
-    return DictComparison(expect_vals) != DictComparison(actual_vals)
-
-
 class HwcModuleException(Exception):
     def __str__(self):
         return "[HwcClientException] message=%s" % self.message
@@ -122,9 +67,9 @@ def session_method_wrapper(f):
         code = r.status_code
         if code not in [200, 201, 202, 203, 204, 205, 206, 207, 208, 226]:
             msg = ""
-            for i in [['message'], ['error', 'message']]:
+            for i in ['message', 'error.message']:
                 try:
-                    msg = navigate_hash(result, i)
+                    msg = navigate_value(result, i)
                     break
                 except Exception:
                     pass
@@ -302,7 +247,7 @@ class HwcModule(AnsibleModule):
         super(HwcModule, self).__init__(*args, **kwargs)
 
 
-class DictComparison(object):
+class _DictComparison(object):
     ''' This class takes in two dictionaries `a` and `b`.
         These are dictionaries of arbitrary depth, but made up of standard
         Python types only.
@@ -372,39 +317,6 @@ class DictComparison(object):
             return to_text(value1) == to_text(value2)
         except (UnicodeError, Exception):
             return False
-
-
-class _DictClean(object):
-    def __init__(self, obj, func):
-        self.obj = obj
-        self.keep_it = func
-
-    def __call__(self):
-        return self._clean_dict(self.obj)
-
-    def _clean_dict(self, obj):
-        r = {}
-        for k, v in obj.items():
-            v1 = v
-            if isinstance(v, dict):
-                v1 = self._clean_dict(v)
-            elif isinstance(v, list):
-                v1 = self._clean_list(v)
-            if self.keep_it(v1):
-                r[k] = v1
-        return r
-
-    def _clean_list(self, obj):
-        r = []
-        for v in obj:
-            v1 = v
-            if isinstance(v, dict):
-                v1 = self._clean_dict(v)
-            elif isinstance(v, list):
-                v1 = self._clean_list(v)
-            if self.keep_it(v1):
-                r.append(v1)
-        return r
 
 
 def wait_to_finish(target, pending, refresh, timeout, min_interval=1, delay=3):
@@ -510,3 +422,11 @@ def get_region(module):
         return module.params['region']
 
     return module.params['project_name'].split("_")[0]
+
+
+def is_empty_value(v):
+    return (not v)
+
+
+def are_different_dicts(dict1, dict2):
+    return _DictComparison(dict1) != _DictComparison(dict2)
