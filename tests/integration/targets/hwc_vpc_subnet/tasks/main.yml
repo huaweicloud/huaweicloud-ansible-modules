@@ -40,8 +40,7 @@
 - name: assert changed is true
   assert:
     that:
-      - result.failed == 0
-      - result.changed == true
+      result is changed
 # ----------------------------------------------------------------------------
 - name: create a subnet that already exists
   hwc_vpc_subnet:
@@ -70,8 +69,7 @@
 - name: assert changed is true
   assert:
     that:
-      - result.failed == 0
-      - result.changed == true
+      result is changed
 # ----------------------------------------------------------------------------
 - name: delete a subnet that does not exist
   hwc_vpc_subnet:
