@@ -47,20 +47,10 @@ options:
                     - The timeouts for create operation.
                 type: str
                 default: '15m'
-    local_vpc:
+    local_vpc_id:
         description:
-            - Specifies information about the local VPC.
+            - Specifies the ID of local VPC.
         required: true
-        suboptions:
-            vpc_id:
-                description:
-                    - Specifies the ID of local VPC.
-                required: true
-            project_id:
-                description:
-                    - Specifies the ID of the project which the local vpc
-                      belongs to.
-                required: false
     name:
         description:
             - Specifies the name of the VPC peering connection. The value can
@@ -101,8 +91,7 @@ EXAMPLES = '''
   register: vpc2
 - name: create a peering connect
   hwc_vpc_peering_connect:
-    local_vpc:
-      vpc_id: "{{ vpc1.id }}"
+    local_vpc_id: "{{ vpc1.id }}"
     name: "ansible_network_peering_test"
     filters:
       - "name"
@@ -111,23 +100,11 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-    local_vpc:
+    local_vpc_id:
         description:
-            - Specifies information about the local VPC.
-        type: complex
+            - Specifies the ID of local VPC.
+        type: str
         returned: success
-        contains:
-            vpc_id:
-                description:
-                    - Specifies the ID of local VPC.
-                type: str
-                returned: success
-            project_id:
-                description:
-                    - Specifies the ID of the project which the local vpc
-                      belongs to.
-                type: str
-                returned: success
     name:
         description:
             - Specifies the name of the VPC peering connection. The value can
@@ -168,13 +145,10 @@ def build_module():
             timeouts=dict(type='dict', options=dict(
                 create=dict(default='15m', type='str'),
             ), default=dict()),
-            local_vpc=dict(required=True, type='dict', options=dict(
-                vpc_id=dict(required=True, type='str'),
-                project_id=dict(type='str')
-            )),
-            name=dict(required=True, type='str'),
-            peering_vpc=dict(required=True, type='dict', options=dict(
-                vpc_id=dict(required=True, type='str'),
+            local_vpc_id=dict(type='str', required=True),
+            name=dict(type='str', required=True),
+            peering_vpc=dict(type='dict', required=True, options=dict(
+                vpc_id=dict(type='str', required=True),
                 project_id=dict(type='str')
             )),
             description=dict(type='str')
@@ -242,7 +216,7 @@ def main():
 def user_input_parameters(module):
     return {
         "description": module.params.get("description"),
-        "local_vpc": module.params.get("local_vpc"),
+        "local_vpc_id": module.params.get("local_vpc_id"),
         "name": module.params.get("name"),
         "peering_vpc": module.params.get("peering_vpc"),
     }
@@ -316,17 +290,13 @@ def read_resource(config, exclude_output=False):
 def _build_query_link(opts):
     query_params = []
 
-    v = navigate_value(opts, ["local_vpc", "vpc_id"])
+    v = navigate_value(opts, ["local_vpc_id"])
     if v:
         query_params.append("vpc_id=" + str(v))
 
     v = navigate_value(opts, ["name"])
     if v:
         query_params.append("name=" + str(v))
-
-    v = navigate_value(opts, ["local_vpc", "project_id"])
-    if v:
-        query_params.append("tenant_id=" + str(v))
 
     query_link = "?marker={marker}&limit=10"
     if query_params:
@@ -408,11 +378,9 @@ def expand_create_accept_vpc_info(d, array_index):
 def expand_create_request_vpc_info(d, array_index):
     r = dict()
 
-    v = navigate_value(d, ["local_vpc", "project_id"], array_index)
-    if not is_empty_value(v):
-        r["tenant_id"] = v
+    r["tenant_id"] = ""
 
-    v = navigate_value(d, ["local_vpc", "vpc_id"], array_index)
+    v = navigate_value(d, ["local_vpc_id"], array_index)
     if not is_empty_value(v):
         r["vpc_id"] = v
 
@@ -579,9 +547,8 @@ def update_properties(module, response, exclude_output=False):
     v = navigate_value(response, ["read", "description"], None)
     r["description"] = v
 
-    v = r.get("local_vpc")
-    v = flatten_local_vpc(response, None, v, exclude_output)
-    r["local_vpc"] = v
+    v = navigate_value(response, ["read", "request_vpc_info", "vpc_id"], None)
+    r["local_vpc_id"] = v
 
     v = navigate_value(response, ["read", "name"], None)
     r["name"] = v
@@ -591,21 +558,6 @@ def update_properties(module, response, exclude_output=False):
     r["peering_vpc"] = v
 
     return r
-
-
-def flatten_local_vpc(d, array_index, current_value, exclude_output):
-    result = current_value
-    if not result:
-        result = dict()
-
-    v = navigate_value(d, ["read", "request_vpc_info", "tenant_id"],
-                       array_index)
-    result["project_id"] = v
-
-    v = navigate_value(d, ["read", "request_vpc_info", "vpc_id"], array_index)
-    result["vpc_id"] = v
-
-    return result
 
 
 def flatten_peering_vpc(d, array_index, current_value, exclude_output):
@@ -681,10 +633,9 @@ def expand_list_accept_vpc_info(d, array_index):
 def expand_list_request_vpc_info(d, array_index):
     r = dict()
 
-    v = navigate_value(d, ["local_vpc", "project_id"], array_index)
-    r["tenant_id"] = v
+    r["tenant_id"] = None
 
-    v = navigate_value(d, ["local_vpc", "vpc_id"], array_index)
+    v = navigate_value(d, ["local_vpc_id"], array_index)
     r["vpc_id"] = v
 
     for _, v in r.items():

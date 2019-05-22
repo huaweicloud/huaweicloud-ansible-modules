@@ -27,8 +27,7 @@
   register: vpc2
 - name: delete a peering connect
   hwc_vpc_peering_connect:
-    local_vpc:
-      vpc_id: "{{ vpc1.id }}"
+    local_vpc_id: "{{ vpc1.id }}"
     name: "ansible_network_peering_test"
     filters:
       - "name"
@@ -38,8 +37,7 @@
 #----------------------------------------------------------
 - name: create a peering connect
   hwc_vpc_peering_connect:
-    local_vpc:
-      vpc_id: "{{ vpc1.id }}"
+    local_vpc_id: "{{ vpc1.id }}"
     name: "ansible_network_peering_test"
     filters:
       - "name"
@@ -54,8 +52,7 @@
 # ----------------------------------------------------------------------------
 - name: create a peering connect that already exists
   hwc_vpc_peering_connect:
-    local_vpc:
-      vpc_id: "{{ vpc1.id }}"
+    local_vpc_id: "{{ vpc1.id }}"
     name: "ansible_network_peering_test"
     filters:
       - "name"
@@ -71,8 +68,7 @@
 #----------------------------------------------------------
 - name: delete a peering connect
   hwc_vpc_peering_connect:
-    local_vpc:
-      vpc_id: "{{ vpc1.id }}"
+    local_vpc_id: "{{ vpc1.id }}"
     name: "ansible_network_peering_test"
     filters:
       - "name"
@@ -87,8 +83,7 @@
 # ----------------------------------------------------------------------------
 - name: delete a peering connect that does not exist
   hwc_vpc_peering_connect:
-    local_vpc:
-      vpc_id: "{{ vpc1.id }}"
+    local_vpc_id: "{{ vpc1.id }}"
     name: "ansible_network_peering_test"
     filters:
       - "name"
