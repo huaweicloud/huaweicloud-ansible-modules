@@ -98,16 +98,18 @@ EXAMPLES = '''
 # create subnet
 - name: create vpc
   hwc_network_vpc:
-      cidr: "192.168.100.0/24"
-      name: "ansible_network_vpc_test"
+    cidr: "192.168.100.0/24"
+    name: "ansible_network_vpc_test"
   register: vpc
 - name: create subnet
   hwc_vpc_subnet:
-      vpc_id: "{{ vpc.id }}"
-      cidr: "192.168.100.0/26"
-      gateway_ip: "192.168.100.32"
-      name: "ansible_network_subnet_test"
-      dhcp_enable: True
+    filters:
+      - "name"
+    vpc_id: "{{ vpc.id }}"
+    cidr: "192.168.100.0/26"
+    gateway_ip: "192.168.100.32"
+    name: "ansible_network_subnet_test"
+    dhcp_enable: True
 '''
 
 RETURN = '''
@@ -169,10 +171,10 @@ def build_module():
                 create=dict(default='15m', type='str'),
                 update=dict(default='15m', type='str'),
             ), default=dict()),
-            cidr=dict(required=True, type='str'),
-            gateway_ip=dict(required=True, type='str'),
-            name=dict(required=True, type='str'),
-            vpc_id=dict(required=True, type='str'),
+            cidr=dict(type='str', required=True),
+            gateway_ip=dict(type='str', required=True),
+            name=dict(type='str', required=True),
+            vpc_id=dict(type='str', required=True),
             availability_zone=dict(type='str'),
             dhcp_enable=dict(type='bool'),
             dns_address=dict(type='list', elements='str')
