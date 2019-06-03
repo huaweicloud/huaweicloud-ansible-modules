@@ -209,10 +209,13 @@ def build_module():
             ), default=dict()),
             subnet_id=dict(type='str', required=True),
             admin_state_up=dict(type='bool'),
-            allowed_address_pairs=dict(type='list', elements='dict', options=dict(
-                ip_address=dict(type='str'),
-                mac_address=dict(type='str')
-            )),
+            allowed_address_pairs=dict(
+                type='list', elements='dict',
+                options=dict(
+                    ip_address=dict(type='str'),
+                    mac_address=dict(type='str')
+                ),
+            ),
             extra_dhcp_opts=dict(type='list', elements='dict', options=dict(
                 name=dict(type='str'),
                 value=dict(type='str')
@@ -253,20 +256,18 @@ def main():
         if module.params['state'] == 'present':
             if resource is None:
                 if not module.check_mode:
-                    result = create(config)
-                    result['id'] = module.params.get('id')
+                    create(config)
                 changed = True
 
-            else:
-                current = read_resource(config, exclude_output=True)
-                expect = user_input_parameters(module)
-                if are_different_dicts(expect, current):
-                    if not module.check_mode:
-                        result = update(config)
-                    changed = True
-                else:
-                    result = read_resource(config)
-                result['id'] = module.params.get('id')
+            current = read_resource(config, exclude_output=True)
+            expect = user_input_parameters(module)
+            if are_different_dicts(expect, current):
+                if not module.check_mode:
+                    update(config)
+                changed = True
+
+            result = read_resource(config)
+            result['id'] = module.params.get('id')
         else:
             if resource:
                 if not module.check_mode:
@@ -304,8 +305,6 @@ def create(config):
     obj = async_wait_create(config, r, client, timeout)
     module.params['id'] = navigate_value(obj, ["port", "id"])
 
-    return read_resource(config)
-
 
 def update(config):
     module = config.module
@@ -315,8 +314,6 @@ def update(config):
     params = build_update_parameters(opts)
     if params:
         send_update_request(module, params, client)
-
-    return read_resource(config)
 
 
 def delete(config):
@@ -454,18 +451,23 @@ def build_create_parameters(opts):
 
 
 def expand_create_allowed_address_pairs(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
     v = navigate_value(d, ["allowed_address_pairs"],
                        new_array_index)
-    n = len(v) if v else 1
+    if not v:
+        return req
+    n = len(v)
     for i in range(n):
         new_array_index["allowed_address_pairs"] = i
         transformed = dict()
 
-        v = navigate_value(d, ["allowed_address_pairs", "ip_address"], new_array_index)
+        v = navigate_value(d, ["allowed_address_pairs", "ip_address"],
+                           new_array_index)
         if not is_empty_value(v):
             transformed["ip_address"] = v
 
@@ -481,13 +483,17 @@ def expand_create_allowed_address_pairs(d, array_index):
 
 
 def expand_create_extra_dhcp_opts(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
     v = navigate_value(d, ["extra_dhcp_opts"],
                        new_array_index)
-    n = len(v) if v else 1
+    if not v:
+        return req
+    n = len(v)
     for i in range(n):
         new_array_index["extra_dhcp_opts"] = i
         transformed = dict()
@@ -507,7 +513,9 @@ def expand_create_extra_dhcp_opts(d, array_index):
 
 
 def expand_create_fixed_ips(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
@@ -578,11 +586,11 @@ def build_update_parameters(opts):
     params = dict()
 
     v = expand_update_allowed_address_pairs(opts, None)
-    if not is_empty_value(v):
+    if v is not None:
         params["allowed_address_pairs"] = v
 
     v = expand_update_extra_dhcp_opts(opts, None)
-    if not is_empty_value(v):
+    if v is not None:
         params["extra_dhcp_opts"] = v
 
     v = navigate_value(opts, ["name"], None)
@@ -602,18 +610,23 @@ def build_update_parameters(opts):
 
 
 def expand_update_allowed_address_pairs(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
     v = navigate_value(d, ["allowed_address_pairs"],
                        new_array_index)
-    n = len(v) if v else 1
+    if not v:
+        return req
+    n = len(v)
     for i in range(n):
         new_array_index["allowed_address_pairs"] = i
         transformed = dict()
 
-        v = navigate_value(d, ["allowed_address_pairs", "ip_address"], new_array_index)
+        v = navigate_value(d, ["allowed_address_pairs", "ip_address"],
+                           new_array_index)
         if not is_empty_value(v):
             transformed["ip_address"] = v
 
@@ -629,13 +642,17 @@ def expand_update_allowed_address_pairs(d, array_index):
 
 
 def expand_update_extra_dhcp_opts(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
     v = navigate_value(d, ["extra_dhcp_opts"],
                        new_array_index)
-    n = len(v) if v else 1
+    if not v:
+        return req
+    n = len(v)
     for i in range(n):
         new_array_index["extra_dhcp_opts"] = i
         transformed = dict()
@@ -788,54 +805,51 @@ def update_properties(module, response, array_index, exclude_output=False):
     r = user_input_parameters(module)
 
     v = navigate_value(response, ["read", "admin_state_up"], array_index)
-    if v is not None:
-        r["admin_state_up"] = v
+    r["admin_state_up"] = v
 
     v = r.get("allowed_address_pairs")
     v = flatten_allowed_address_pairs(response, array_index, v, exclude_output)
-    if v is not None:
-        r["allowed_address_pairs"] = v
+    r["allowed_address_pairs"] = v
 
     v = r.get("extra_dhcp_opts")
     v = flatten_extra_dhcp_opts(response, array_index, v, exclude_output)
-    if v is not None:
-        r["extra_dhcp_opts"] = v
+    r["extra_dhcp_opts"] = v
 
     v = navigate_value(response, ["read", "fixed_ips", "ip_address"],
                        array_index)
-    if v is not None:
-        r["ip_address"] = v
+    r["ip_address"] = v
 
     if not exclude_output:
         v = navigate_value(response, ["read", "mac_address"], array_index)
-        if v is not None:
-            r["mac_address"] = v
+        r["mac_address"] = v
 
     v = navigate_value(response, ["read", "name"], array_index)
-    if v is not None:
-        r["name"] = v
+    r["name"] = v
 
     v = navigate_value(response, ["read", "security_groups"], array_index)
-    if v is not None:
-        r["security_groups"] = v
+    r["security_groups"] = v
 
     v = navigate_value(response, ["read", "network_id"], array_index)
-    if v is not None:
-        r["subnet_id"] = v
+    r["subnet_id"] = v
 
     return r
 
 
-def flatten_allowed_address_pairs(d, array_index, current_value, exclude_output):
+def flatten_allowed_address_pairs(d, array_index,
+                                  current_value, exclude_output):
     n = 0
     result = current_value
+    has_init_value = True
     if result:
         n = len(result)
     else:
+        has_init_value = False
         result = []
         v = navigate_value(d, ["read", "allowed_address_pairs"],
                            array_index)
-        n = len(v) if v else 1
+        if not v:
+            return current_value
+        n = len(v)
 
     new_array_index = dict()
     if array_index:
@@ -845,35 +859,42 @@ def flatten_allowed_address_pairs(d, array_index, current_value, exclude_output)
         new_array_index["read.allowed_address_pairs"] = i
 
         val = dict()
-        if len(result) >= (i + 1):
+        if len(result) >= (i + 1) and result[i]:
             val = result[i]
 
         v = navigate_value(d, ["read", "allowed_address_pairs", "ip_address"],
                            new_array_index)
-        if v is not None:
-            val["ip_address"] = v
+        val["ip_address"] = v
 
         v = navigate_value(d, ["read", "allowed_address_pairs", "mac_address"],
                            new_array_index)
-        if v is not None:
-            val["mac_address"] = v
+        val["mac_address"] = v
 
-        if val and len(result) < (i + 1):
-            result.append(val)
+        if len(result) >= (i + 1):
+            result[i] = val
+        else:
+            for _, v in val.items():
+                if v is not None:
+                    result.append(val)
+                    break
 
-    return result if result else current_value
+    return result if (has_init_value or result) else current_value
 
 
 def flatten_extra_dhcp_opts(d, array_index, current_value, exclude_output):
     n = 0
     result = current_value
+    has_init_value = True
     if result:
         n = len(result)
     else:
+        has_init_value = False
         result = []
         v = navigate_value(d, ["read", "extra_dhcp_opts"],
                            array_index)
-        n = len(v) if v else 1
+        if not v:
+            return current_value
+        n = len(v)
 
     new_array_index = dict()
     if array_index:
@@ -883,23 +904,26 @@ def flatten_extra_dhcp_opts(d, array_index, current_value, exclude_output):
         new_array_index["read.extra_dhcp_opts"] = i
 
         val = dict()
-        if len(result) >= (i + 1):
+        if len(result) >= (i + 1) and result[i]:
             val = result[i]
 
         v = navigate_value(d, ["read", "extra_dhcp_opts", "opt_name"],
                            new_array_index)
-        if v is not None:
-            val["name"] = v
+        val["name"] = v
 
         v = navigate_value(d, ["read", "extra_dhcp_opts", "opt_value"],
                            new_array_index)
-        if v is not None:
-            val["value"] = v
+        val["value"] = v
 
-        if val and len(result) < (i + 1):
-            result.append(val)
+        if len(result) >= (i + 1):
+            result[i] = val
+        else:
+            for _, v in val.items():
+                if v is not None:
+                    result.append(val)
+                    break
 
-    return result if result else current_value
+    return result if (has_init_value or result) else current_value
 
 
 def send_list_request(module, client, url):
@@ -966,7 +990,9 @@ def _build_identity_object(module, all_opts):
 
 
 def expand_list_allowed_address_pairs(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
@@ -978,7 +1004,8 @@ def expand_list_allowed_address_pairs(d, array_index):
         new_array_index["allowed_address_pairs"] = i
         transformed = dict()
 
-        v = navigate_value(d, ["allowed_address_pairs", "ip_address"], new_array_index)
+        v = navigate_value(d, ["allowed_address_pairs", "ip_address"],
+                           new_array_index)
         transformed["ip_address"] = v
 
         v = navigate_value(d, ["allowed_address_pairs", "mac_address"],
@@ -994,7 +1021,9 @@ def expand_list_allowed_address_pairs(d, array_index):
 
 
 def expand_list_extra_dhcp_opts(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
@@ -1021,7 +1050,9 @@ def expand_list_extra_dhcp_opts(d, array_index):
 
 
 def expand_list_fixed_ips(d, array_index):
-    new_array_index = copy.deepcopy(array_index) if array_index else dict()
+    new_array_index = dict()
+    if array_index:
+        new_array_index.update(array_index)
 
     req = []
 
