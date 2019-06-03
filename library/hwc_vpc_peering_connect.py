@@ -185,20 +185,18 @@ def main():
         if module.params['state'] == 'present':
             if resource is None:
                 if not module.check_mode:
-                    result = create(config)
-                    result['id'] = module.params.get('id')
+                    create(config)
                 changed = True
 
-            else:
-                current = read_resource(config, exclude_output=True)
-                expect = user_input_parameters(module)
-                if are_different_dicts(expect, current):
-                    if not module.check_mode:
-                        result = update(config)
-                    changed = True
-                else:
-                    result = read_resource(config)
-                result['id'] = module.params.get('id')
+            current = read_resource(config, exclude_output=True)
+            expect = user_input_parameters(module)
+            if are_different_dicts(expect, current):
+                if not module.check_mode:
+                    update(config)
+                changed = True
+
+            result = read_resource(config)
+            result['id'] = module.params.get('id')
         else:
             if resource:
                 if not module.check_mode:
@@ -233,8 +231,6 @@ def create(config):
     obj = async_wait_create(config, r, client, timeout)
     module.params['id'] = navigate_value(obj, ["peering", "id"])
 
-    return read_resource(config)
-
 
 def update(config):
     module = config.module
@@ -244,8 +240,6 @@ def update(config):
     params = build_update_parameters(opts)
     if params:
         send_update_request(module, params, client)
-
-    return read_resource(config)
 
 
 def delete(config):
@@ -281,10 +275,11 @@ def read_resource(config, exclude_output=False):
     client = config.client(get_region(module), "network", "project")
 
     res = {}
+
     r = send_read_request(module, client)
     res["read"] = fill_read_resp_body(r)
 
-    return update_properties(module, res, exclude_output)
+    return update_properties(module, res, None, exclude_output)
 
 
 def _build_query_link(opts):
@@ -541,20 +536,21 @@ def fill_read_resp_request_vpc_info(value):
     return result
 
 
-def update_properties(module, response, exclude_output=False):
+def update_properties(module, response, array_index, exclude_output=False):
     r = user_input_parameters(module)
 
-    v = navigate_value(response, ["read", "description"], None)
+    v = navigate_value(response, ["read", "description"], array_index)
     r["description"] = v
 
-    v = navigate_value(response, ["read", "request_vpc_info", "vpc_id"], None)
+    v = navigate_value(response, ["read", "request_vpc_info", "vpc_id"],
+                       array_index)
     r["local_vpc_id"] = v
 
-    v = navigate_value(response, ["read", "name"], None)
+    v = navigate_value(response, ["read", "name"], array_index)
     r["name"] = v
 
     v = r.get("peering_vpc")
-    v = flatten_peering_vpc(response, None, v, exclude_output)
+    v = flatten_peering_vpc(response, array_index, v, exclude_output)
     r["peering_vpc"] = v
 
     return r
@@ -562,8 +558,10 @@ def update_properties(module, response, exclude_output=False):
 
 def flatten_peering_vpc(d, array_index, current_value, exclude_output):
     result = current_value
+    has_init_value = True
     if not result:
         result = dict()
+        has_init_value = False
 
     v = navigate_value(d, ["read", "accept_vpc_info", "tenant_id"],
                        array_index)
@@ -572,7 +570,13 @@ def flatten_peering_vpc(d, array_index, current_value, exclude_output):
     v = navigate_value(d, ["read", "accept_vpc_info", "vpc_id"], array_index)
     result["vpc_id"] = v
 
-    return result
+    if has_init_value:
+        return result
+
+    for _, v in result.items():
+        if v is not None:
+            return result
+    return current_value
 
 
 def send_list_request(module, client, url):
