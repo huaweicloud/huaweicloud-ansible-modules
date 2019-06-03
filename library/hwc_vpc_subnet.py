@@ -211,20 +211,18 @@ def main():
         if module.params['state'] == 'present':
             if resource is None:
                 if not module.check_mode:
-                    result = create(config)
-                    result['id'] = module.params.get('id')
+                    create(config)
                 changed = True
 
-            else:
-                current = read_resource(config, exclude_output=True)
-                expect = user_input_parameters(module)
-                if are_different_dicts(expect, current):
-                    if not module.check_mode:
-                        result = update(config)
-                    changed = True
-                else:
-                    result = read_resource(config)
-                result['id'] = module.params.get('id')
+            current = read_resource(config, exclude_output=True)
+            expect = user_input_parameters(module)
+            if are_different_dicts(expect, current):
+                if not module.check_mode:
+                    update(config)
+                changed = True
+
+            result = read_resource(config)
+            result['id'] = module.params.get('id')
         else:
             if resource:
                 if not module.check_mode:
@@ -262,8 +260,6 @@ def create(config):
     obj = async_wait_create(config, r, client, timeout)
     module.params['id'] = navigate_value(obj, ["subnet", "id"])
 
-    return read_resource(config)
-
 
 def update(config):
     module = config.module
@@ -275,8 +271,6 @@ def update(config):
     if params:
         r = send_update_request(module, params, client)
         async_wait_update(config, r, client, timeout)
-
-    return read_resource(config)
 
 
 def delete(config):
@@ -312,10 +306,11 @@ def read_resource(config, exclude_output=False):
     client = config.client(get_region(module), "vpc", "project")
 
     res = {}
+
     r = send_read_request(module, client)
     res["read"] = fill_read_resp_body(r)
 
-    return update_properties(module, res, exclude_output)
+    return update_properties(module, res, None, exclude_output)
 
 
 def _build_query_link(opts):
@@ -626,28 +621,28 @@ def fill_read_resp_body(body):
     return result
 
 
-def update_properties(module, response, exclude_output=False):
+def update_properties(module, response, array_index, exclude_output=False):
     r = user_input_parameters(module)
 
-    v = navigate_value(response, ["read", "availability_zone"], None)
+    v = navigate_value(response, ["read", "availability_zone"], array_index)
     r["availability_zone"] = v
 
-    v = navigate_value(response, ["read", "cidr"], None)
+    v = navigate_value(response, ["read", "cidr"], array_index)
     r["cidr"] = v
 
-    v = navigate_value(response, ["read", "dhcp_enable"], None)
+    v = navigate_value(response, ["read", "dhcp_enable"], array_index)
     r["dhcp_enable"] = v
 
-    v = navigate_value(response, ["read", "dnsList"], None)
+    v = navigate_value(response, ["read", "dnsList"], array_index)
     r["dns_address"] = v
 
-    v = navigate_value(response, ["read", "gateway_ip"], None)
+    v = navigate_value(response, ["read", "gateway_ip"], array_index)
     r["gateway_ip"] = v
 
-    v = navigate_value(response, ["read", "name"], None)
+    v = navigate_value(response, ["read", "name"], array_index)
     r["name"] = v
 
-    v = navigate_value(response, ["read", "vpc_id"], None)
+    v = navigate_value(response, ["read", "vpc_id"], array_index)
     r["vpc_id"] = v
 
     return r
