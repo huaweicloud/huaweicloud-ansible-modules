@@ -133,13 +133,11 @@ def main():
         if module.params['state'] == 'present':
             if resource is None:
                 if not module.check_mode:
-                    result = create(config)
-                    result['id'] = module.params.get('id')
+                    create(config)
                 changed = True
 
-            else:
-                result = read_resource(config)
-                result['id'] = module.params.get('id')
+            result = read_resource(config)
+            result['id'] = module.params.get('id')
         else:
             if resource:
                 if not module.check_mode:
@@ -171,8 +169,6 @@ def create(config):
     module.params['id'] = navigate_value(r, ["privateips", "id"],
                                          {"privateips": 0})
 
-    return read_resource(config)
-
 
 def delete(config):
     module = config.module
@@ -186,10 +182,11 @@ def read_resource(config, exclude_output=False):
     client = config.client(get_region(module), "vpc", "project")
 
     res = {}
+
     r = send_read_request(module, client)
     res["read"] = fill_read_resp_body(r)
 
-    return update_properties(module, res, exclude_output)
+    return update_properties(module, res, None, exclude_output)
 
 
 def _build_query_link(opts):
@@ -297,13 +294,13 @@ def fill_read_resp_body(body):
     return result
 
 
-def update_properties(module, response, exclude_output=False):
+def update_properties(module, response, array_index, exclude_output=False):
     r = user_input_parameters(module)
 
-    v = navigate_value(response, ["read", "ip_address"], None)
+    v = navigate_value(response, ["read", "ip_address"], array_index)
     r["ip_address"] = v
 
-    v = navigate_value(response, ["read", "subnet_id"], None)
+    v = navigate_value(response, ["read", "subnet_id"], array_index)
     r["subnet_id"] = v
 
     return r
