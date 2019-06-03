@@ -207,13 +207,11 @@ def main():
         if module.params['state'] == 'present':
             if resource is None:
                 if not module.check_mode:
-                    result = create(config)
-                    result['id'] = module.params.get('id')
+                    create(config)
                 changed = True
 
-            else:
-                result = read_resource(config)
-                result['id'] = module.params.get('id')
+            result = read_resource(config)
+            result['id'] = module.params.get('id')
         else:
             if resource:
                 if not module.check_mode:
@@ -245,8 +243,6 @@ def create(config):
     r = send_create_request(module, params, client)
     module.params['id'] = navigate_value(r, ["security_group", "id"])
 
-    return read_resource(config)
-
 
 def delete(config):
     module = config.module
@@ -260,10 +256,11 @@ def read_resource(config, exclude_output=False):
     client = config.client(get_region(module), "vpc", "project")
 
     res = {}
+
     r = send_read_request(module, client)
     res["read"] = fill_read_resp_body(r)
 
-    return update_properties(module, res, exclude_output)
+    return update_properties(module, res, None, exclude_output)
 
 
 def _build_query_link(opts):
@@ -429,25 +426,26 @@ def fill_read_resp_security_group_rules(value):
     return result
 
 
-def update_properties(module, response, exclude_output=False):
+def update_properties(module, response, array_index, exclude_output=False):
     r = user_input_parameters(module)
 
     if not exclude_output:
-        v = navigate_value(response, ["read", "description"], None)
+        v = navigate_value(response, ["read", "description"], array_index)
         r["description"] = v
 
-    v = navigate_value(response, ["read", "enterprise_project_id"], None)
+    v = navigate_value(response, ["read", "enterprise_project_id"],
+                       array_index)
     r["enterprise_project_id"] = v
 
-    v = navigate_value(response, ["read", "name"], None)
+    v = navigate_value(response, ["read", "name"], array_index)
     r["name"] = v
 
     if not exclude_output:
         v = r.get("rules")
-        v = flatten_rules(response, None, v, exclude_output)
+        v = flatten_rules(response, array_index, v, exclude_output)
         r["rules"] = v
 
-    v = navigate_value(response, ["read", "vpc_id"], None)
+    v = navigate_value(response, ["read", "vpc_id"], array_index)
     r["vpc_id"] = v
 
     return r
@@ -456,12 +454,16 @@ def update_properties(module, response, exclude_output=False):
 def flatten_rules(d, array_index, current_value, exclude_output):
     n = 0
     result = current_value
+    has_init_value = True
     if result:
         n = len(result)
     else:
+        has_init_value = False
         result = []
         v = navigate_value(d, ["read", "security_group_rules"],
                            array_index)
+        if not v:
+            return current_value
         n = len(v)
 
     new_array_index = dict()
@@ -472,7 +474,7 @@ def flatten_rules(d, array_index, current_value, exclude_output):
         new_array_index["read.security_group_rules"] = i
 
         val = dict()
-        if len(result) >= (i + 1):
+        if len(result) >= (i + 1) and result[i]:
             val = result[i]
 
         if not exclude_output:
@@ -525,10 +527,15 @@ def flatten_rules(d, array_index, current_value, exclude_output):
                                new_array_index)
             val["remote_ip_prefix"] = v
 
-        if val and len(result) < (i + 1):
-            result.append(val)
+        if len(result) >= (i + 1):
+            result[i] = val
+        else:
+            for _, v in val.items():
+                if v is not None:
+                    result.append(val)
+                    break
 
-    return result
+    return result if (has_init_value or result) else current_value
 
 
 def send_list_request(module, client, url):
