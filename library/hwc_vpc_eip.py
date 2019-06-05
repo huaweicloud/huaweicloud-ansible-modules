@@ -392,8 +392,9 @@ def delete(config):
     module = config.module
     client = config.client(get_region(module), "vpc", "project")
 
-    module.params["port_id"] = ""
-    update(config)
+    if module.params["port_id"]:
+        module.params["port_id"] = ""
+        update(config)
 
     send_delete_request(module, None, client)
 
