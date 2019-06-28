@@ -1,7 +1,7 @@
 huaweicloud.huaweicloud_ansible_modules
 =========
 
-This role includes the latest changes and bug fixes for Azure modules from the `devel` branch of [Ansible repository](https://github.com/ansible/ansible). If you cannot wait for Ansible's next release, installing this role is a good choice. 
+This role includes the latest changes and bug fixes for HuaweiCloud modules from the `devel` branch of [Ansible repository](https://github.com/ansible/ansible). If you cannot wait for Ansible's next release, installing this role is a good choice. 
 
 Prerequisite
 ------------
