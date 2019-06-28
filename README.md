@@ -6,7 +6,7 @@ This role includes the latest changes and bug fixes for Azure modules from the `
 Prerequisite
 ------------
 
-The usage of this playbook role assumes that you've already setup an Ansible environment for Azure.
+The usage of this playbook role assumes that you've already setup an Ansible environment for HuaweiCloud.
 
 
 Installation
