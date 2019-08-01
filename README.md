@@ -28,10 +28,10 @@ Example Playbook
 		- name: create a new vpc
 		  hwc_network_vpc:
 			identity_endpoint: "https://iam.cn-north-1.myhwclouds.com/v3"
-			user_name: "{{ user_name }}"
+			user: "{{ user_name }}"
 			password: "{{ password }}"
-			domain_name: "{{ domain_name }}"
-			project_name: "{{ project_name }}"
+			domain: "{{ domain_name }}"
+			project: "{{ project_name }}"
 			region: "{{ region }}"
 
 			name: "{{ vpc_name }}"
