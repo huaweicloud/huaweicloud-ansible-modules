@@ -5,9 +5,12 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
-    get_region, is_empty_value, navigate_value)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -19,15 +22,15 @@ module: hwc_vpc_security_group_rule
 description:
     - vpc security group management.
 short_description: Creates a resource of Vpc/SecurityGroupRule in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
             - Whether the given object should exist in Huawei Cloud.
+        type: str
         choices: ['present', 'absent']
         default: 'present'
     filters:
@@ -35,50 +38,59 @@ options:
             - A list of filters to apply when deciding whether existing
               resources match and should be altered. The item of filters
               is the name of input options.
+        type: list
         required: true
     direction:
         description:
             - Specifies the direction of access control. The value can be
               egress or ingress.
+        type: str
         required: true
     security_group_id:
         description:
             - Specifies the security group rule ID, which uniquely identifies
               the security group rule.
+        type: str
         required: true
     description:
         description:
             - Provides supplementary information about the security group rule.
               The value is a string of no more than 255 characters that can
               contain letters and digits.
+        type: str
         required: false
     ethertype:
         description:
             - Specifies the IP protocol version. The value can be IPv4 or IPv6.
               If you do not set this parameter, IPv4 is used by default.
+        type: str
         required: false
     port_range_max:
         description:
             - Specifies the end port number. The value ranges from 1 to 65535.
               If the protocol is not icmp, the value cannot be smaller than the
               port_range_min value. An empty value indicates all ports.
+        type: int
         required: false
     port_range_min:
         description:
             - Specifies the start port number. The value ranges from 1 to
               65535. The value cannot be greater than the port_range_max value.
               An empty value indicates all ports.
+        type: int
         required: false
     protocol:
         description:
             - Specifies the protocol type. The value can be icmp, tcp, or udp.
               If the parameter is left blank, the security group supports all
               protocols.
+        type: str
         required: false
     remote_group_id:
         description:
             - Specifies the ID of the peer security group. The value is
               exclusive with parameter remote_ip_prefix.
+        type: str
         required: false
     remote_ip_prefix:
         description:
@@ -88,6 +100,7 @@ options:
               specifies the destination IP address. The value can be in the
               CIDR format or IP addresses. The parameter is exclusive with
               parameter remote_group_id.
+        type: str
         required: false
 extends_documentation_fragment: hwc
 '''
@@ -178,6 +191,10 @@ RETURN = '''
         returned: success
 '''
 
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
+    get_region, is_empty_value, navigate_value)
+
 
 def build_module():
     return HwcModule(
@@ -212,11 +229,8 @@ def main():
         else:
             v = search_resource(config)
             if len(v) > 1:
-                raise Exception(
-                    "find more than one resources(%s)" % ", ".join([
-                            navigate_value(i, ["id"])
-                            for i in v
-                        ]))
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
             if len(v) == 1:
                 resource = v[0]

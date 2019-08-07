@@ -5,10 +5,12 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcClientException404, HwcModule,
-    are_different_dicts, build_path, get_region, is_empty_value,
-    navigate_value, wait_to_finish)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -20,15 +22,15 @@ module: hwc_vpc_subnet
 description:
     - subnet management.
 short_description: Creates a resource of Vpc/Subnet in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
             - Whether the given object should exist in Huawei Cloud.
+        type: str
         choices: ['present', 'absent']
         default: 'present'
     filters:
@@ -36,6 +38,7 @@ options:
             - A list of filters to apply when deciding whether existing
               resources match and should be altered. The item of filters
               is the name of input options.
+        type: list
         required: true
     timeouts:
         description:
@@ -57,25 +60,30 @@ options:
             - Specifies the subnet CIDR block. The value must be within the VPC
               CIDR block and be in CIDR format. The subnet mask cannot be
               greater than 28.
+        type: str
         required: true
     gateway_ip:
         description:
             - Specifies the gateway of the subnet. The value must be an IP
               address in the subnet.
+        type: str
         required: true
     name:
         description:
             - Specifies the subnet name. The value is a string of 1 to 64
               characters that can contain letters, digits, underscores C(_),
               hyphens (-), and periods (.).
+        type: str
         required: true
     vpc_id:
         description:
             - Specifies the ID of the VPC to which the subnet belongs.
+        type: str
         required: true
     availability_zone:
         description:
             - Specifies the AZ to which the subnet belongs.
+        type: str
         required: false
     dhcp_enable:
         description:
@@ -88,8 +96,9 @@ options:
         required: false
     dns_address:
         description:
-            - Specifies the DNS server addresses for subnet. Note: the address
+            - Specifies the DNS server addresses for subnet. The address
               in the head will be used first.
+        type: list
         required: false
 extends_documentation_fragment: hwc
 '''
@@ -160,6 +169,11 @@ RETURN = '''
         returned: success
 '''
 
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcClientException404, HwcModule,
+    are_different_dicts, build_path, get_region, is_empty_value,
+    navigate_value, wait_to_finish)
+
 
 def build_module():
     return HwcModule(
@@ -196,11 +210,8 @@ def main():
         else:
             v = search_resource(config)
             if len(v) > 1:
-                raise Exception(
-                    "find more than one resources(%s)" % ", ".join([
-                            navigate_value(i, ["id"])
-                            for i in v
-                        ]))
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
             if len(v) == 1:
                 resource = v[0]

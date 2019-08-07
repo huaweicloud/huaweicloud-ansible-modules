@@ -5,10 +5,13 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcClientException404, HwcModule,
-    are_different_dicts, build_path, get_region, is_empty_value,
-    navigate_value, wait_to_finish)
+
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -20,15 +23,15 @@ module: hwc_vpc_peering_connect
 description:
     - vpc peering management.
 short_description: Creates a resource of Vpc/PeeringConnect in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
             - Whether the given object should exist in Huawei Cloud.
+        type: str
         choices: ['present', 'absent']
         default: 'present'
     filters:
@@ -36,6 +39,7 @@ options:
             - A list of filters to apply when deciding whether existing
               resources match and should be altered. The item of filters
               is the name of input options.
+        type: list
         required: true
     timeouts:
         description:
@@ -50,29 +54,35 @@ options:
     local_vpc_id:
         description:
             - Specifies the ID of local VPC.
+        type: str
         required: true
     name:
         description:
             - Specifies the name of the VPC peering connection. The value can
               contain 1 to 64 characters.
+        type: str
         required: true
     peering_vpc:
         description:
             - Specifies information about the peering VPC.
+        type: complex
         required: true
         suboptions:
             vpc_id:
                 description:
                     - Specifies the ID of peering VPC.
+                type: str
                 required: true
             project_id:
                 description:
                     - Specifies the ID of the project which the peering vpc
                       belongs to.
+                type: str
                 required: false
     description:
         description:
             - The description of vpc peering connection.
+        type: str
         required: false
 extends_documentation_fragment: hwc
 '''
@@ -135,6 +145,11 @@ RETURN = '''
         returned: success
 '''
 
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcClientException404, HwcModule,
+    are_different_dicts, build_path, get_region, is_empty_value,
+    navigate_value, wait_to_finish)
+
 
 def build_module():
     return HwcModule(
@@ -170,11 +185,8 @@ def main():
         else:
             v = search_resource(config)
             if len(v) > 1:
-                raise Exception(
-                    "find more than one resources(%s)" % ", ".join([
-                            navigate_value(i, ["id"])
-                            for i in v
-                        ]))
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
             if len(v) == 1:
                 resource = v[0]
@@ -573,7 +585,7 @@ def flatten_peering_vpc(d, array_index, current_value, exclude_output):
     if has_init_value:
         return result
 
-    for _, v in result.items():
+    for v in result.values():
         if v is not None:
             return result
     return current_value
@@ -628,7 +640,7 @@ def expand_list_accept_vpc_info(d, array_index):
     v = navigate_value(d, ["peering_vpc", "vpc_id"], array_index)
     r["vpc_id"] = v
 
-    for _, v in r.items():
+    for v in r.values():
         if v is not None:
             return r
     return None
@@ -642,7 +654,7 @@ def expand_list_request_vpc_info(d, array_index):
     v = navigate_value(d, ["local_vpc_id"], array_index)
     r["vpc_id"] = v
 
-    for _, v in r.items():
+    for v in r.values():
         if v is not None:
             return r
     return None

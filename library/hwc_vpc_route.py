@@ -5,9 +5,12 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
-    get_region, is_empty_value, navigate_value)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -19,15 +22,15 @@ module: hwc_vpc_route
 description:
     - vpc route management.
 short_description: Creates a resource of Vpc/Route in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
             - Whether the given object should exist in Huawei Cloud.
+        type: str
         choices: ['present', 'absent']
         default: 'present'
     filters:
@@ -35,22 +38,27 @@ options:
             - A list of filters to apply when deciding whether existing
               resources match and should be altered. The item of filters
               is the name of input options.
+        type: list
         required: true
     destination:
         description:
             - Specifies the destination IP address or CIDR block.
+        type: str
         required: true
     next_hop:
         description:
             - Specifies the next hop. The value is VPC peering connection ID.
+        type: str
         required: true
     vpc_id:
         description:
             - Specifies the VPC ID to which route is added.
+        type: str
         required: true
     type:
         description:
             - Specifies the type of route. Default value is "peering".
+        type: str
         required: false
 extends_documentation_fragment: hwc
 '''
@@ -110,6 +118,10 @@ RETURN = '''
         returned: success
 '''
 
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
+    get_region, is_empty_value, navigate_value)
+
 
 def build_module():
     return HwcModule(
@@ -139,11 +151,8 @@ def main():
         else:
             v = search_resource(config)
             if len(v) > 1:
-                raise Exception(
-                    "find more than one resources(%s)" % ", ".join([
-                            navigate_value(i, ["id"])
-                            for i in v
-                        ]))
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
             if len(v) == 1:
                 resource = v[0]

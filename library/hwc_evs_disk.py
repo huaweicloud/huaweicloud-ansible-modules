@@ -5,9 +5,12 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
-    get_region, is_empty_value, navigate_value, wait_to_finish)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -19,10 +22,9 @@ module: hwc_evs_disk
 description:
     - block storage management.
 short_description: Creates a resource of Evs/Disk in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
@@ -328,6 +330,10 @@ RETURN = '''
         type: dict
         returned: success
 '''
+
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
+    get_region, is_empty_value, navigate_value, wait_to_finish)
 
 
 def build_module():
@@ -997,7 +1003,7 @@ def flatten_attachments(d, array_index):
         v = navigate_value(d, ["read", "attachments", "server_id"], new_ai)
         val["server_id"] = v
 
-        for _, v in val.items():
+        for v in val.values():
             if v is not None:
                 result.append(val)
                 break
@@ -1144,7 +1150,7 @@ def expand_list_metadata(d, array_index):
 
     r["readonly"] = None
 
-    for _, v in r.items():
+    for v in r.values():
         if v is not None:
             return r
     return None
@@ -1156,7 +1162,7 @@ def expand_list_volume_image_metadata(d, array_index):
     v = navigate_value(d, ["image_id"], array_index)
     r["id"] = v
 
-    for _, v in r.items():
+    for v in r.values():
         if v is not None:
             return r
     return None

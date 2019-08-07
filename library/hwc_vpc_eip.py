@@ -5,10 +5,12 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcClientException404, HwcModule,
-    are_different_dicts, build_path, get_region, is_empty_value,
-    navigate_value, wait_to_finish)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -20,15 +22,15 @@ module: hwc_vpc_eip
 description:
     - elastic ip management.
 short_description: Creates a resource of Vpc/EIP in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
             - Whether the given object should exist in Huawei Cloud.
+        type: str
         choices: ['present', 'absent']
         default: 'present'
     filters:
@@ -36,6 +38,7 @@ options:
             - A list of filters to apply when deciding whether existing
               resources match and should be altered. The item of filters
               is the name of input options.
+        type: list
         required: true
     timeouts:
         description:
@@ -56,15 +59,17 @@ options:
         description:
             - Specifies the EIP type. The value can be 5_telcom, 5_union,
               5_bgp, or 5_sbgp.
-            - CN Northeast-Dalian: 5_telcom and 5_union.
-            - CN South-Guangzhou: 5_sbgp.
-            - CN East-Shanghai2: 5_sbgp.
-            - CN North-Beijing1: 5_bgp and 5_sbgp.
-            - AP-Hong Kong: 5_bgp.
+            - CN Northeast-Dalian is 5_telcom and 5_union.
+            - CN South-Guangzhou is 5_sbgp.
+            - CN East-Shanghai2 is 5_sbgp.
+            - CN North-Beijing1 is 5_bgp and 5_sbgp.
+            - AP-Hong Kong is 5_bgp.
+        type: str
         required: true
     dedicated_bandwidth:
         description:
             - Specifies the dedicated bandwidth object.
+        type: complex
         required: false
         suboptions:
             charge_mode:
@@ -75,12 +80,14 @@ options:
                       string, default value bandwidth is used. For IPv6
                       addresses, the default parameter value is bandwidth
                       outside China and is traffic in China.
+                type: str
                 required: true
             name:
                 description:
                     - Specifies the bandwidth name. The value is a string of 1
                       to 64 characters that can contain letters, digits,
                       underscores C(_), hyphens (-), and periods (.).
+                type: str
                 required: true
             size:
                 description:
@@ -90,7 +97,7 @@ options:
                       can see the bandwidth range of each region on the
                       management console.) The minimum unit for bandwidth
                       adjustment varies depending on the bandwidth range. The
-                      details are as follows:.
+                      details are as follows.
                     - The minimum unit is 1 Mbit/s if the allowed bandwidth
                       size ranges from 0 to 300 Mbit/s (with 300 Mbit/s
                       included).
@@ -99,29 +106,35 @@ options:
                       included).
                     - The minimum unit is 500 Mbit/s if the allowed bandwidth
                       size is greater than 1000 Mbit/s.
+                type: int
                 required: true
     enterprise_project_id:
         description:
             - Specifies the enterprise project ID.
+        type: str
         required: false
     ip_version:
         description:
             - The value can be 4 (IPv4 address) or 6 (IPv6 address). If this
               parameter is left blank, an IPv4 address will be assigned.
+        type: str
         required: false
     ipv4_address:
         description:
             - Specifies the obtained IPv4 EIP. The system automatically assigns
               an EIP if you do not specify it.
+         type: str
         required: false
     port_id:
         description:
             - Specifies the port ID. This parameter is returned only when a
               private IP address is bound with the EIP.
+        type: str
         required: false
     shared_bandwidth_id:
         description:
             - Specifies the ID of shared bandwidth.
+        type: str
         required: false
 extends_documentation_fragment: hwc
 '''
@@ -271,6 +284,11 @@ RETURN = '''
         returned: success
 '''
 
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcClientException404, HwcModule,
+    are_different_dicts, build_path, get_region, is_empty_value,
+    navigate_value, wait_to_finish)
+
 
 def build_module():
     return HwcModule(
@@ -311,11 +329,8 @@ def main():
         else:
             v = search_resource(config)
             if len(v) > 1:
-                raise Exception(
-                    "find more than one resources(%s)" % ", ".join([
-                            navigate_value(i, ["id"])
-                            for i in v
-                        ]))
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
             if len(v) == 1:
                 resource = v[0]

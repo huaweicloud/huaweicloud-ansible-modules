@@ -5,10 +5,12 @@
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcClientException404, HwcModule,
-    are_different_dicts, build_path, get_region, is_empty_value,
-    navigate_value, wait_to_finish)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
+###############################################################################
+# Documentation
+###############################################################################
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ["preview"],
@@ -20,15 +22,15 @@ module: hwc_vpc_port
 description:
     - vpc port management.
 short_description: Creates a resource of Vpc/Port in Huawei Cloud
-version_added: 2.9
+version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - python >= 2.7
     - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
             - Whether the given object should exist in Huawei Cloud.
+        type: str
         choices: ['present', 'absent']
         default: 'present'
     filters:
@@ -36,6 +38,7 @@ options:
             - A list of filters to apply when deciding whether existing
               resources match and should be altered. The item of filters
               is the name of input options.
+        type: list
         required: true
     timeouts:
         description:
@@ -50,6 +53,7 @@ options:
     subnet_id:
         description:
             - Specifies the ID of the subnet to which the port belongs.
+        type: str
         required: true
     admin_state_up:
         description:
@@ -67,36 +71,44 @@ options:
                       Configure an independent security group for the port if a
                       large CIDR block (subnet mask less than 24) is configured
                       for parameter allowed_address_pairs.
+                type: str
                 required: false
             mac_address:
                 description:
                     - Specifies the MAC address.
+                type: str
                 required: false
     extra_dhcp_opts:
         description:
             - Specifies the extended option of DHCP.
+        type: complex
         required: false
         suboptions:
             name:
                 description:
                     - Specifies the option name.
+                type: str
                 required: false
             value:
                 description:
                     - Specifies the option value.
+                type: str
                 required: false
     ip_address:
         description:
             - Specifies the port IP address.
+        type: str
         required: false
     name:
         description:
             - Specifies the port name. The value can contain no more than 255
               characters.
+        type: str
         required: false
     security_groups:
         description:
             - Specifies the ID of the security group.
+        type: list
         required: false
 extends_documentation_fragment: hwc
 '''
@@ -197,6 +209,11 @@ RETURN = '''
         returned: success
 '''
 
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcClientException404, HwcModule,
+    are_different_dicts, build_path, get_region, is_empty_value,
+    navigate_value, wait_to_finish)
+
 
 def build_module():
     return HwcModule(
@@ -241,11 +258,8 @@ def main():
         else:
             v = search_resource(config)
             if len(v) > 1:
-                raise Exception(
-                    "find more than one resources(%s)" % ", ".join([
-                            navigate_value(i, ["id"])
-                            for i in v
-                        ]))
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
             if len(v) == 1:
                 resource = v[0]
@@ -873,7 +887,7 @@ def flatten_allowed_address_pairs(d, array_index,
         if len(result) >= (i + 1):
             result[i] = val
         else:
-            for _, v in val.items():
+            for v in val.values():
                 if v is not None:
                     result.append(val)
                     break
@@ -918,7 +932,7 @@ def flatten_extra_dhcp_opts(d, array_index, current_value, exclude_output):
         if len(result) >= (i + 1):
             result[i] = val
         else:
-            for _, v in val.items():
+            for v in val.values():
                 if v is not None:
                     result.append(val)
                     break
@@ -1012,7 +1026,7 @@ def expand_list_allowed_address_pairs(d, array_index):
                            new_array_index)
         transformed["mac_address"] = v
 
-        for _, v in transformed.items():
+        for v in transformed.values():
             if v is not None:
                 req.append(transformed)
                 break
@@ -1041,7 +1055,7 @@ def expand_list_extra_dhcp_opts(d, array_index):
         v = navigate_value(d, ["extra_dhcp_opts", "value"], new_array_index)
         transformed["opt_value"] = v
 
-        for _, v in transformed.items():
+        for v in transformed.values():
             if v is not None:
                 req.append(transformed)
                 break
@@ -1063,7 +1077,7 @@ def expand_list_fixed_ips(d, array_index):
         v = navigate_value(d, ["ip_address"], new_array_index)
         transformed["ip_address"] = v
 
-        for _, v in transformed.items():
+        for v in transformed.values():
             if v is not None:
                 req.append(transformed)
                 break
