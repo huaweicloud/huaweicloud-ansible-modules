@@ -8,7 +8,7 @@ Prerequisite
 
 The usage of this playbook role assumes that you've already setup an Ansible environment for HuaweiCloud.
 
-[Installed the ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) in your environment
+[Installed the ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) in your environment.
 
 Installation
 ------------
