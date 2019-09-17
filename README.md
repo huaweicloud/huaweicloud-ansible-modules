@@ -22,6 +22,7 @@ Install the role.
 Example Playbook
 ----------------
 
+    #cat test.yml
     - hosts: localhost
       roles:
         - { role: huaweicloud.huaweicloud_ansible_modules }
@@ -42,6 +43,12 @@ Example Playbook
 		- name: dump the output
 		  debug:
 			msg: '{{ vpc }}'
+
+Run ansible
+-----------
+```
+# ansible-playbook user.yml
+```
 
 License
 -------
