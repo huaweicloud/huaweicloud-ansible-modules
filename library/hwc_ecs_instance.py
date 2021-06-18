@@ -187,12 +187,6 @@ options:
               assigned.
         type: str
         required: false
-    enable_auto_recovery:
-        description:
-            - Specifies whether automatic recovery is enabled on the ECS. "true:
-              enables this function. false: disables this function".
-        type: bool
-        required: false
     enterprise_project_id:
         description:
             - Specifies the ID of the enterprise project to which the ECS
@@ -278,7 +272,6 @@ EXAMPLES = '''
   hwc_ecs_instance:
     data_volumes:
       - volume_id: "{{ disk.id }}"
-    enable_auto_recovery: false
     eip_id: "{{ eip.id }}"
     name: "ansible_ecs_instance_test"
     availability_zone: "cn-north-1a"
@@ -440,12 +433,6 @@ RETURN = '''
               Only elastic IP addresses in the DOWN state can be assigned.
         type: str
         returned: success
-    enable_auto_recovery:
-        description:
-            - Specifies whether automatic recovery is enabled on the ECS. "true:
-              enables this function. false: disables this function".
-        type: bool
-        returned: success
     enterprise_project_id:
         description:
             - Specifies the ID of the enterprise project to which the ECS
@@ -531,14 +518,20 @@ RETURN = '''
         returned: success
 '''
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
-    get_region, is_empty_value, navigate_value, wait_to_finish)
+from ansible.module_utils.hwc_utils import HwcModuleBase
+from ansible.module_utils.hwc_utils import HwcModuleException
+from ansible.module_utils.hwc_utils import are_different_dicts
+from ansible.module_utils.hwc_utils import navigate_value
+from ansible.module_utils.hwc_utils import is_empty_value
+from ansible.module_utils.hwc_utils import wait_to_finish
+
+from huaweicloudsdkcore.exceptions import exceptions
+from huaweicloudsdkecs.v2 import *
 
 
-def build_module():
-    return HwcModule(
-        argument_spec=dict(
+class HwcEcsInstance(HwcModuleBase):
+    def __init__(self):
+        self.argument_spec=dict(
             state=dict(default='present', choices=['present', 'absent'],
                        type='str'),
             filters=dict(required=True, type='list', elements='str'),
@@ -571,85 +564,322 @@ def build_module():
             )),
             description=dict(type='str'),
             eip_id=dict(type='str'),
-            enable_auto_recovery=dict(type='bool'),
             enterprise_project_id=dict(type='str'),
             security_groups=dict(type='list', elements='str'),
             server_metadata=dict(type='dict'),
             server_tags=dict(type='dict'),
             ssh_key_name=dict(type='str'),
             user_data=dict(type='str')
-        ),
-        supports_check_mode=True,
-    )
+        )
 
+        self.results = dict(
+            changed=False,
+            state=dict()
+        )
 
-def main():
-    """Main function"""
+        super(HwcEcsInstance, self).__init__(self.argument_spec, supports_check_mode=True)
 
-    module = build_module()
-    config = Config(module, "ecs")
+    def exec_module(self, **kwargs):
 
-    try:
-        _init(config)
-        is_exist = module.params['id']
+        self.results['check_mode'] = self.check_mode
 
-        result = None
-        changed = False
-        if module.params['state'] == 'present':
-            if not is_exist:
-                if not module.check_mode:
-                    create(config)
-                changed = True
+        try:
+            resource = None
+            if self.module.params['id']:
+                resource = True
+            else:
+                v = self.search_resource()
+                if len(v) > 1:
+                    raise Exception("find more than one resources(%s)" % ", ".join([
+                                    navigate_value(i, ["id"]) for i in v]))
 
-            inputv = user_input_parameters(module)
-            resp, array_index = read_resource(config)
-            result = build_state(inputv, resp, array_index)
-            set_readonly_options(inputv, result)
-            if are_different_dicts(inputv, result):
-                if not module.check_mode:
-                    update(config, inputv, result)
+                if len(v) == 1:
+                    resource = v[0]
+                    self.module.params['id'] = navigate_value(resource, ["id"])
 
-                    inputv = user_input_parameters(module)
-                    resp, array_index = read_resource(config)
-                    result = build_state(inputv, resp, array_index)
-                    set_readonly_options(inputv, result)
-                    if are_different_dicts(inputv, result):
-                        raise Exception("Update resource failed, "
-                                        "some attributes are not updated")
+            result = {}
+            changed = False
 
-                changed = True
+            if self.module.params['state'] == 'present':
+                if not resource:
+                    if not self.module.check_mode:
+                        self.create()
+                    changed = True
 
-            result['id'] = module.params.get('id')
+                inputv = user_input_parameters(self.module)
+                resp, array_index = self.read()
+                result = build_state(inputv, resp, array_index)
+                set_readonly_options(inputv, result)
+                if are_different_dicts(inputv, result):
+                    if not self.module.check_mode:
+                        self.update(inputv, result)
+                        inputv = user_input_parameters(self.module)
+                        resp, array_index = self.read()
+                        result = build_state(inputv, resp, array_index)
+                        set_readonly_options(inputv, result)
+                        if are_different_dicts(inputv, result):
+                            raise Exception("Update resource failed, "
+                                            "some attributes are not updated")
+
+                    changed = True
+
+                result['id'] = self.module.params.get('id')
+            else:
+                result = dict()
+                if resource:
+                    if not self.module.check_mode:
+                        self.delete()
+                        result['status'] = 'Deleted'
+                    changed = True
+
+        except Exception as ex:
+            self.module.fail_json(msg=str(ex))
+
         else:
-            result = dict()
-            if is_exist:
-                if not module.check_mode:
-                    delete(config)
-                changed = True
+            self.results['state'] = result
+            self.results['changed'] = changed
 
-    except Exception as ex:
-        module.fail_json(msg=str(ex))
+        return self.results
 
-    else:
-        result['changed'] = changed
-        module.exit_json(**result)
+    def search_resource(self):
+        opts = user_input_parameters(self.module)
+        identity_obj = _build_identity_object(self.module, opts)
+        result = []
+        offset = 1
+
+        while True:
+            try:
+                request = ListServersDetailsRequest(limit=10, offset=offset)
+                self.log('list ecs request: %s' % request)
+                response = self.ecs_client.list_servers_details(request)
+                self.log('list ecs response: %s' % response)
+            except exceptions.ClientRequestException as e:
+                raise HwcModuleException(
+                        'search ecs failed: %s' % e.error_msg)
+            r = navigate_value(response.to_json_object(), ['servers'], None)
+
+            if not r:
+                break
+
+            for item in r:
+                item = fill_list_resp_body(item)
+                adjust_list_resp(identity_obj, item)
+                self.log('ecs identity_obj: %s' % identity_obj)
+                self.log('ecs item: %s' % item)
+                if not are_different_dicts(identity_obj, item):
+                    result.append(item)
+
+            if len(result) > 1:
+                break
+
+            offset += 1
+
+        return result
+
+    def create(self):
+        opts = user_input_parameters(self.module)
+        timeout = 60 * int(self.module.params['timeouts']['create'].rstrip('m'))
+        try:
+            request_body = build_create_parameters(opts)
+            request = CreateServersRequest(request_body)
+            self.log('create ecs request body: %s' %request)
+            response = self.ecs_client.create_servers(request)
+            self.log('create ecs response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Create ecs failed: %s' % e)
+
+        job_id = response.to_json_object()['job_id']
+
+        obj = self.async_wait(job_id, timeout)
+
+        sub_job_identity = {
+            "job_type": "createSingleServer",
+        }
+        for item in navigate_value(obj, ["entities", "sub_jobs"]):
+            for k, v in sub_job_identity.items():
+                if item[k] != v:
+                    break
+            else:
+                obj = item
+                break
+        else:
+            raise Exception("Can't find the sub job")
+        self.module.params['id'] = navigate_value(obj, ["entities", "server_id"])
+
+    def read(self):
+        try:
+            request = ShowServerRequest(self.module.params['id'])
+            self.log('read ecs request body: %s' %request)
+            response = self.ecs_client.show_server(request)
+            self.log('read ecs response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('read ecs failed: %s' % e)
+
+        r = response.to_json_object()['server']
+        res = {}
+        preprocess_read_response(r)
+        res["read"] = fill_read_resp_body(r)
+
+        return res, None
+
+    def update(self, expect_state, current_state):
+        self.log('expect_state: %s' % expect_state)
+        self.log('current_state: %s' % current_state)
+        timeout = 60 * int(self.module.params['timeouts']['update'].rstrip('m'))
+
+        params = build_update_parameters(expect_state)
+        params1 = build_update_parameters(current_state)
+        if params and are_different_dicts(params, params1):
+            try:
+                request = UpdateServerRequest(self.module.params['id'], params)
+                self.log('Update ecs request body: %s' %request)
+                response = self.ecs_client.update_server(request)
+                self.log('Update ecs response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('Update ecs failed: %s' % e)
 
 
-def _init(config):
-    module = config.module
-    if module.params['id']:
-        return
+        expect_state["current_state"] = current_state
+        current_state["current_state"] = current_state
+        params = build_delete_nics_parameters(expect_state)
+        params1 = build_delete_nics_parameters(current_state)
+        self.log('delete params: %s' % params)
+        self.log('delete params1: %s' % params1)
+        if params and are_different_dicts(params, params1):
+            try:
+                request = BatchDeleteServerNicsRequest(self.module.params['id'], params)
+                self.log('delete ecs server nics request body: %s' %request)
+                response = self.ecs_client.batch_delete_server_nics(request)
+                self.log('delete ecs server nics response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('Delete ecs server nics failed: %s' % e)
 
-    v = search_resource(config)
-    n = len(v)
-    if n > 1:
-        raise Exception("find more than one resources(%s)" % ", ".join([
-            navigate_value(i, ["id"])
-            for i in v
-        ]))
+            job_id = response.to_json_object()['job_id']    
+            self.async_wait(job_id, timeout)
 
-    if n == 1:
-        module.params['id'] = navigate_value(v[0], ["id"])
+        params = build_attach_nics_parameters(expect_state)
+        params1 = build_attach_nics_parameters(current_state)
+        self.log('add params: %s' % params)
+        self.log('add params1: %s' % params1)
+        if params and are_different_dicts(params, params1):
+            try:
+                request = BatchAddServerNicsRequest(self.module.params['id'], params)
+                self.log('add ecs server nics request body: %s' %request)
+                response = self.ecs_client.batch_add_server_nics(request)
+                self.log('add ecs server nics response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('add ecs server nics failed: %s' % e)
+
+            job_id = response.to_json_object()['job_id']
+            self.async_wait(job_id, timeout)
+
+
+        self.multi_invoke_delete_volume(expect_state, timeout)
+
+        self.multi_invoke_attach_data_disk(expect_state, timeout)
+
+    def delete(self):
+        timeout = 60 * int(self.module.params['timeouts']['delete'].rstrip('m'))
+        try:
+            requset_body = build_delete_parameters(self.module.params['id'])
+            request = DeleteServersRequest(requset_body)
+            self.log('delete ecs request body: %s' %request)
+            response = self.ecs_client.delete_servers(request)
+            self.log('delete ecs response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Delete ecs failed: %s' % e)
+
+        job_id = response.to_json_object()['job_id']
+
+        self.async_wait(job_id, timeout)
+
+    def async_wait(self, job_id, timeout):
+        def _query_status():
+            r = None
+            try:
+                request = ShowJobRequest(job_id)
+                self.log('show job request body: %s' %request)
+                response = self.ecs_client.show_job(request)
+                self.log('show job response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('show job failed: %s' % e)
+
+            r = response.to_json_object()
+
+            try:
+                s = navigate_value(r, ["status"])
+                return r, s
+            except Exception:
+                return None, ""
+
+        try:
+            return wait_to_finish(
+                ["SUCCESS"],
+                ["RUNNING", "INIT"],
+                _query_status, timeout)
+        except Exception as ex:
+            self.module.fail_json(msg="module(hwc_ecs_instance): error "
+                                "waiting to be done, error= %s" % str(ex))
+
+
+    def multi_invoke_delete_volume(self, opts, timeout):
+        opts1 = None
+        expect = opts["data_volumes"]
+        current = opts["current_state"]["data_volumes"]
+        if expect and current:
+            v = [i["volume_id"] for i in expect]
+            opts1 = {
+                "data_volumes": [
+                    i for i in current if i["volume_id"] not in v
+                ]
+            }
+
+        loop_val = navigate_value(opts1, ["data_volumes"])
+        if not loop_val:
+            return
+
+        for i in range(len(loop_val)):
+            try:
+                request = DetachServerVolumeRequest(self.module.params['id'], loop_val[i]["volume_id"])
+                self.log('detach ecs volume request body: %s' %request)
+                response = self.ecs_client.detach_server_volume(request)
+                self.log('detach ecs volume response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('detach ecs volume failed: %s' % e)
+
+            job_id = response.to_json_object()['job_id']
+
+            self.async_wait(job_id, timeout)
+
+
+    def multi_invoke_attach_data_disk(self, opts, timeout):
+        opts1 = opts
+        expect = opts["data_volumes"]
+        current = opts["current_state"]["data_volumes"]
+        if expect and current:
+            v = [i["volume_id"] for i in current]
+            opts1 = {
+                "data_volumes": [
+                    i for i in expect if i["volume_id"] not in v
+                ]
+            }
+
+        loop_val = navigate_value(opts1, ["data_volumes"])
+        if not loop_val:
+            return
+
+        for i in range(len(loop_val)):
+            requset_body = build_attach_data_disk_parameters(opts1, {"data_volumes": i})
+            try:
+                request = AttachServerVolumeRequest(self.module.params['id'], requset_body)
+                self.log('attach ecs volume request body: %s' %request)
+                response = self.ecs_client.attach_server_volume(request)
+                self.log('attach ecs volume response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('attach ecs volume failed: %s' % e)
+
+            job_id = response.to_json_object()['job_id']    
+            self.async_wait(job_id, timeout)
 
 
 def user_input_parameters(module):
@@ -659,7 +889,6 @@ def user_input_parameters(module):
         "data_volumes": module.params.get("data_volumes"),
         "description": module.params.get("description"),
         "eip_id": module.params.get("eip_id"),
-        "enable_auto_recovery": module.params.get("enable_auto_recovery"),
         "enterprise_project_id": module.params.get("enterprise_project_id"),
         "flavor_name": module.params.get("flavor_name"),
         "image_id": module.params.get("image_id"),
@@ -673,91 +902,6 @@ def user_input_parameters(module):
         "user_data": module.params.get("user_data"),
         "vpc_id": module.params.get("vpc_id"),
     }
-
-
-def create(config):
-    module = config.module
-    client = config.client(get_region(module), "ecs", "project")
-    timeout = 60 * int(module.params['timeouts']['create'].rstrip('m'))
-    opts = user_input_parameters(module)
-    opts["ansible_module"] = module
-
-    params = build_create_parameters(opts)
-    r = send_create_request(module, params, client)
-    obj = async_wait(config, r, client, timeout)
-
-    sub_job_identity = {
-        "job_type": "createSingleServer",
-    }
-    for item in navigate_value(obj, ["entities", "sub_jobs"]):
-        for k, v in sub_job_identity.items():
-            if item[k] != v:
-                break
-        else:
-            obj = item
-            break
-    else:
-        raise Exception("Can't find the sub job")
-    module.params['id'] = navigate_value(obj, ["entities", "server_id"])
-
-
-def update(config, expect_state, current_state):
-    module = config.module
-    expect_state["current_state"] = current_state
-    current_state["current_state"] = current_state
-    timeout = 60 * int(module.params['timeouts']['update'].rstrip('m'))
-    client = config.client(get_region(module), "ecs", "project")
-
-    params = build_delete_nics_parameters(expect_state)
-    params1 = build_delete_nics_parameters(current_state)
-    if params and are_different_dicts(params, params1):
-        r = send_delete_nics_request(module, params, client)
-        async_wait(config, r, client, timeout)
-
-    params = build_set_auto_recovery_parameters(expect_state)
-    params1 = build_set_auto_recovery_parameters(current_state)
-    if params and are_different_dicts(params, params1):
-        send_set_auto_recovery_request(module, params, client)
-
-    params = build_attach_nics_parameters(expect_state)
-    params1 = build_attach_nics_parameters(current_state)
-    if params and are_different_dicts(params, params1):
-        r = send_attach_nics_request(module, params, client)
-        async_wait(config, r, client, timeout)
-
-    multi_invoke_delete_volume(config, expect_state, client, timeout)
-
-    multi_invoke_attach_data_disk(config, expect_state, client, timeout)
-
-
-def delete(config):
-    module = config.module
-    client = config.client(get_region(module), "ecs", "project")
-    timeout = 60 * int(module.params['timeouts']['delete'].rstrip('m'))
-
-    opts = user_input_parameters(module)
-    opts["ansible_module"] = module
-
-    params = build_delete_parameters(opts)
-    if params:
-        r = send_delete_request(module, params, client)
-        async_wait(config, r, client, timeout)
-
-
-def read_resource(config):
-    module = config.module
-    client = config.client(get_region(module), "ecs", "project")
-
-    res = {}
-
-    r = send_read_request(module, client)
-    preprocess_read_response(r)
-    res["read"] = fill_read_resp_body(r)
-
-    r = send_read_auto_recovery_request(module, client)
-    res["read_auto_recovery"] = fill_read_auto_recovery_resp_body(r)
-
-    return res, None
 
 
 def preprocess_read_response(resp):
@@ -805,56 +949,6 @@ def build_state(opts, response, array_index):
     return states
 
 
-def _build_query_link(opts):
-    query_params = []
-
-    v = navigate_value(opts, ["enterprise_project_id"])
-    if v or v in [False, 0]:
-        query_params.append(
-            "enterprise_project_id=" + (str(v) if v else str(v).lower()))
-
-    v = navigate_value(opts, ["name"])
-    if v or v in [False, 0]:
-        query_params.append(
-            "name=" + (str(v) if v else str(v).lower()))
-
-    query_link = "?limit=10&offset={offset}"
-    if query_params:
-        query_link += "&" + "&".join(query_params)
-
-    return query_link
-
-
-def search_resource(config):
-    module = config.module
-    client = config.client(get_region(module), "ecs", "project")
-    opts = user_input_parameters(module)
-    identity_obj = _build_identity_object(module, opts)
-    query_link = _build_query_link(opts)
-    link = "cloudservers/detail" + query_link
-
-    result = []
-    p = {'offset': 1}
-    while True:
-        url = link.format(**p)
-        r = send_list_request(module, client, url)
-        if not r:
-            break
-
-        for item in r:
-            item = fill_list_resp_body(item)
-            adjust_list_resp(identity_obj, item)
-            if not are_different_dicts(identity_obj, item):
-                result.append(item)
-
-        if len(result) > 1:
-            break
-
-        p['offset'] += 1
-
-    return result
-
-
 def build_delete_nics_parameters(opts):
     params = dict()
 
@@ -887,47 +981,6 @@ def expand_delete_nics_nics(d, array_index):
 
         if transformed:
             r.append(transformed)
-
-    return r
-
-
-def send_delete_nics_request(module, params, client):
-    url = build_path(module, "cloudservers/{id}/nics/delete")
-
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(delete_nics), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def build_set_auto_recovery_parameters(opts):
-    params = dict()
-
-    v = expand_set_auto_recovery_support_auto_recovery(opts, None)
-    if v is not None:
-        params["support_auto_recovery"] = v
-
-    return params
-
-
-def expand_set_auto_recovery_support_auto_recovery(d, array_index):
-    v = navigate_value(d, ["enable_auto_recovery"], None)
-    return None if v is None else str(v).lower()
-
-
-def send_set_auto_recovery_request(module, params, client):
-    url = build_path(module, "cloudservers/{id}/autorecovery")
-
-    try:
-        r = client.put(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(set_auto_recovery), error: %s" % str(ex))
-        module.fail_json(msg=msg)
 
     return r
 
@@ -1007,6 +1060,25 @@ def build_create_parameters(opts):
     return params
 
 
+def build_update_parameters(opts):
+    params = dict()
+
+    v = navigate_value(opts, ["description"], None)
+    if not is_empty_value(v):
+        params["description"] = v
+
+    v = navigate_value(opts, ["name"], None)
+    if not is_empty_value(v):
+        params["name"] = v
+
+    if not params:
+        return params
+
+    params = {"server": params}
+
+    return params
+
+
 def expand_create_extendparam(d, array_index):
     r = dict()
 
@@ -1015,10 +1087,6 @@ def expand_create_extendparam(d, array_index):
     v = navigate_value(d, ["enterprise_project_id"], array_index)
     if not is_empty_value(v):
         r["enterprise_project_id"] = v
-
-    v = navigate_value(d, ["enable_auto_recovery"], array_index)
-    if not is_empty_value(v):
-        r["support_auto_recovery"] = v
 
     return r
 
@@ -1108,18 +1176,6 @@ def expand_create_server_tags(d, array_index):
     return [{"key": k, "value": v1} for k, v1 in v.items()]
 
 
-def send_create_request(module, params, client):
-    url = "cloudservers"
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(create), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
 def build_attach_nics_parameters(opts):
     params = dict()
 
@@ -1160,40 +1216,6 @@ def expand_attach_nics_nics(d, array_index):
     return r
 
 
-def send_attach_nics_request(module, params, client):
-    url = build_path(module, "cloudservers/{id}/nics")
-
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(attach_nics), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def send_delete_volume_request(module, params, client, info):
-    path_parameters = {
-        "volume_id": ["volume_id"],
-    }
-    data = {
-        key: navigate_value(info, path)
-        for key, path in path_parameters.items()
-    }
-
-    url = build_path(module, "cloudservers/{id}/detachvolume/{volume_id}", data)
-
-    try:
-        r = client.delete(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(delete_volume), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
 def build_attach_data_disk_parameters(opts, array_index):
     params = dict()
 
@@ -1218,157 +1240,16 @@ def expand_attach_data_disk_volume_attachment(d, array_index):
     return r
 
 
-def send_attach_data_disk_request(module, params, client):
-    url = build_path(module, "cloudservers/{id}/attachvolume")
-
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(attach_data_disk), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def build_delete_parameters(opts):
+def build_delete_parameters(id):
     params = dict()
 
     params["delete_publicip"] = False
 
     params["delete_volume"] = False
 
-    v = expand_delete_servers(opts, None)
-    if not is_empty_value(v):
-        params["servers"] = v
+    params["servers"] = [{"id": id}]
 
     return params
-
-
-def expand_delete_servers(d, array_index):
-    new_ai = dict()
-    if array_index:
-        new_ai.update(array_index)
-
-    req = []
-
-    n = 1
-    for i in range(n):
-        transformed = dict()
-
-        v = expand_delete_servers_id(d, new_ai)
-        if not is_empty_value(v):
-            transformed["id"] = v
-
-        if transformed:
-            req.append(transformed)
-
-    return req
-
-
-def expand_delete_servers_id(d, array_index):
-    return d["ansible_module"].params.get("id")
-
-
-def send_delete_request(module, params, client):
-    url = "cloudservers/delete"
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(delete), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def async_wait(config, result, client, timeout):
-    module = config.module
-
-    url = build_path(module, "jobs/{job_id}", result)
-
-    def _query_status():
-        r = None
-        try:
-            r = client.get(url, timeout=timeout)
-        except HwcClientException:
-            return None, ""
-
-        try:
-            s = navigate_value(r, ["status"])
-            return r, s
-        except Exception:
-            return None, ""
-
-    try:
-        return wait_to_finish(
-            ["SUCCESS"],
-            ["RUNNING", "INIT"],
-            _query_status, timeout)
-    except Exception as ex:
-        module.fail_json(msg="module(hwc_ecs_instance): error "
-                             "waiting to be done, error= %s" % str(ex))
-
-
-def multi_invoke_delete_volume(config, opts, client, timeout):
-    module = config.module
-
-    opts1 = None
-    expect = opts["data_volumes"]
-    current = opts["current_state"]["data_volumes"]
-    if expect and current:
-        v = [i["volume_id"] for i in expect]
-        opts1 = {
-            "data_volumes": [
-                i for i in current if i["volume_id"] not in v
-            ]
-        }
-
-    loop_val = navigate_value(opts1, ["data_volumes"])
-    if not loop_val:
-        return
-
-    for i in range(len(loop_val)):
-        r = send_delete_volume_request(module, None, client, loop_val[i])
-        async_wait(config, r, client, timeout)
-
-
-def multi_invoke_attach_data_disk(config, opts, client, timeout):
-    module = config.module
-
-    opts1 = opts
-    expect = opts["data_volumes"]
-    current = opts["current_state"]["data_volumes"]
-    if expect and current:
-        v = [i["volume_id"] for i in current]
-        opts1 = {
-            "data_volumes": [
-                i for i in expect if i["volume_id"] not in v
-            ]
-        }
-
-    loop_val = navigate_value(opts1, ["data_volumes"])
-    if not loop_val:
-        return
-
-    for i in range(len(loop_val)):
-        params = build_attach_data_disk_parameters(opts1, {"data_volumes": i})
-        r = send_attach_data_disk_request(module, params, client)
-        async_wait(config, r, client, timeout)
-
-
-def send_read_request(module, client):
-    url = build_path(module, "cloudservers/{id}")
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(read), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return navigate_value(r, ["server"], None)
 
 
 def fill_read_resp_body(body):
@@ -1514,28 +1395,6 @@ def fill_read_resp_root_volume(value):
     return result
 
 
-def send_read_auto_recovery_request(module, client):
-    url = build_path(module, "cloudservers/{id}/autorecovery")
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(read_auto_recovery), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def fill_read_auto_recovery_resp_body(body):
-    result = dict()
-
-    result["support_auto_recovery"] = body.get("support_auto_recovery")
-
-    return result
-
-
 def flatten_options(response, array_index):
     r = dict()
 
@@ -1557,9 +1416,6 @@ def flatten_options(response, array_index):
 
     v = navigate_value(response, ["read", "OS-DCF:diskConfig"], array_index)
     r["disk_config_type"] = v
-
-    v = flatten_enable_auto_recovery(response, array_index)
-    r["enable_auto_recovery"] = v
 
     v = navigate_value(
         response, ["read", "enterprise_project_id"], array_index)
@@ -1646,12 +1502,6 @@ def flatten_data_volumes(d, array_index):
                 break
 
     return result if result else None
-
-
-def flatten_enable_auto_recovery(d, array_index):
-    v = navigate_value(d, ["read_auto_recovery", "support_auto_recovery"],
-                       array_index)
-    return v == "true"
 
 
 def flatten_nics(d, array_index):
@@ -1936,19 +1786,6 @@ def set_readonly_root_volume(inputv, curv):
     inputv["volume_id"] = curv.get("volume_id")
 
 
-def send_list_request(module, client, url):
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_ecs_instance): error running "
-               "api(list), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return navigate_value(r, ["servers"], None)
-
-
 def _build_identity_object(module, all_opts):
     filters = module.params.get("filters")
     opts = dict()
@@ -2157,6 +1994,10 @@ def adjust_list_api_tags(parent_input, parent_cur):
     if cv:
         result.extend(cv)
     parent_cur["tags"] = result
+
+
+def main():
+    HwcEcsInstance()
 
 
 if __name__ == '__main__':

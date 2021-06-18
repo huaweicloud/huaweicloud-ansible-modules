@@ -13,15 +13,6 @@ from huaweicloudsdkecs.v2 import EcsClient
 from huaweicloudsdkevs.v2 import EvsClient
 from huaweicloudsdkcce.v3 import CceClient
 
-    def fail(self, msg, **kwargs):
-        '''
-        Shortcut for calling module.fail()
-        :param msg: Error message text.
-        :param kwargs: Any key=value pairs
-        :return: None
-        '''
-        self.module.fail_json(msg=msg, **kwargs)
-
 from ansible.module_utils.basic import (AnsibleModule, env_fallback,)
 from ansible.module_utils._text import to_text
 class HwcModuleBase(object):
@@ -276,46 +267,46 @@ class _DictComparison(object):
             value2, errors='surrogate_or_strict'))
 
 
-# def wait_to_finish(target, pending, refresh, timeout, min_interval=1, delay=3):
-#     is_last_time = False
-#     not_found_times = 0
-#     wait = 0
+def wait_to_finish(target, pending, refresh, timeout, min_interval=1, delay=3):
+    is_last_time = False
+    not_found_times = 0
+    wait = 0
 
-#     time.sleep(delay)
+    time.sleep(delay)
 
-#     end = time.time() + timeout
-#     while not is_last_time:
-#         if time.time() > end:
-#             is_last_time = True
+    end = time.time() + timeout
+    while not is_last_time:
+        if time.time() > end:
+            is_last_time = True
 
-#         obj, status = refresh()
+        obj, status = refresh()
 
-#         if obj is None:
-#             not_found_times += 1
+        if obj is None:
+            not_found_times += 1
 
-#             if not_found_times > 10:
-#                 raise HwcModuleException(
-#                     "not found the object for %d times" % not_found_times)
-#         else:
-#             not_found_times = 0
+            if not_found_times > 10:
+                raise HwcModuleException(
+                    "not found the object for %d times" % not_found_times)
+        else:
+            not_found_times = 0
 
-#             if status in target:
-#                 return obj
+            if status in target:
+                return obj
 
-#             if pending and status not in pending:
-#                 raise HwcModuleException(
-#                     "unexpect status(%s) occured" % status)
+            if pending and status not in pending:
+                raise HwcModuleException(
+                    "unexpect status(%s) occured" % status)
 
-#         if not is_last_time:
-#             wait *= 2
-#             if wait < min_interval:
-#                 wait = min_interval
-#             elif wait > 10:
-#                 wait = 10
+        if not is_last_time:
+            wait *= 2
+            if wait < min_interval:
+                wait = min_interval
+            elif wait > 10:
+                wait = 10
 
-#             time.sleep(wait)
+            time.sleep(wait)
 
-#     raise HwcModuleException("asycn wait timeout after %d seconds" % timeout)
+    raise HwcModuleException("asycn wait timeout after %d seconds" % timeout)
 
 
 def navigate_value(data, index, array_index=None):
