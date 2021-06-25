@@ -25,7 +25,8 @@ short_description: Creates a resource of Vpc/Subnet in Huawei Cloud
 version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - keystoneauth1 >= 3.6.0
+    - huaweicloudsdkcore >= 3.0.47
+    - huaweicloudsdkvpc >= 3.0.47
 options:
     state:
         description:
@@ -87,12 +88,15 @@ options:
         required: false
     dhcp_enable:
         description:
-            - Specifies whether DHCP is enabled for the subnet. The value can
-              be true (enabled) or false(disabled), and default value is true.
-              If this parameter is set to false, newly created ECSs cannot
-              obtain IP addresses, and usernames and passwords cannot be
-              injected using Cloud-init.
+            - Specifies whether DHCP is enabled for the subnet.
         type: bool
+        default: 'true'
+        required: false
+    ipv6_enable:
+        description:
+            - Specifies whether the IPv6 function is enabled for the subnet.
+        type: bool
+        default: 'false'
         required: false
     dns_address:
         description:
@@ -100,13 +104,18 @@ options:
               in the head will be used first.
         type: list
         required: false
+    tags:
+        description:
+            - Specifies the key/value pairs to associate with the subnet.
+        type: dict
+        required: false
 extends_documentation_fragment: hwc
 '''
 
 EXAMPLES = '''
 # create subnet
 - name: create vpc
-  hwc_network_vpc:
+  hwc_vpc:
     cidr: "192.168.100.0/24"
     name: "ansible_network_vpc_test"
   register: vpc
@@ -114,7 +123,7 @@ EXAMPLES = '''
   hwc_vpc_subnet:
     filters:
       - "name"
-    vpc_id: "{{ vpc.id }}"
+    vpc_id: "{{ vpc.state.id }}"
     cidr: "192.168.100.0/26"
     gateway_ip: "192.168.100.32"
     name: "ansible_network_subnet_test"
@@ -154,11 +163,12 @@ RETURN = '''
         returned: success
     dhcp_enable:
         description:
-            - Specifies whether DHCP is enabled for the subnet. The value can
-              be true (enabled) or false(disabled), and default value is true.
-              If this parameter is set to false, newly created ECSs cannot
-              obtain IP addresses, and usernames and passwords cannot be
-              injected using Cloud-init.
+            - Specifies whether DHCP is enabled for the subnet.
+        type: bool
+        returned: success
+    ipv6_enable:
+        description:
+            - Specifies whether the IPv6 function is enabled for the subnet.
         type: bool
         returned: success
     dns_address:
@@ -167,17 +177,29 @@ RETURN = '''
               in the head will be used first.
         type: list
         returned: success
+    tags:
+        description:
+            - Specifies the key/value pairs to associate with the subnet.
+        type: dict
+        returned: success
 '''
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcClientException404, HwcModule,
-    are_different_dicts, build_path, get_region, is_empty_value,
-    navigate_value, wait_to_finish)
+from ansible.module_utils.hwc_utils import HwcModuleBase
+from ansible.module_utils.hwc_utils import HwcModuleException
+from ansible.module_utils.hwc_utils import are_different_dicts
+from ansible.module_utils.hwc_utils import navigate_value
+from ansible.module_utils.hwc_utils import is_empty_value
+from ansible.module_utils.hwc_utils import build_tags_parameters
+from ansible.module_utils.hwc_utils import tags_to_dict
+from ansible.module_utils.hwc_utils import wait_to_finish
+
+from huaweicloudsdkcore.exceptions import exceptions
+from huaweicloudsdkvpc.v2 import *
 
 
-def build_module():
-    return HwcModule(
-        argument_spec=dict(
+class HwcVpcSubnet(HwcModuleBase):
+    def __init__(self):
+        self.argument_spec=dict(
             state=dict(default='present', choices=['present', 'absent'],
                        type='str'),
             filters=dict(required=True, type='list', elements='str'),
@@ -189,177 +211,266 @@ def build_module():
             gateway_ip=dict(type='str', required=True),
             name=dict(type='str', required=True),
             vpc_id=dict(type='str', required=True),
+            dhcp_enable=dict(default=True, type='bool'),
+            ipv6_enable=dict(default=False, type='bool'),
+            dns_address=dict(type='list', elements='str'),
             availability_zone=dict(type='str'),
-            dhcp_enable=dict(type='bool'),
-            dns_address=dict(type='list', elements='str')
-        ),
-        supports_check_mode=True,
-    )
+            tags=dict(type='dict')
+        )
 
+        self.results = dict(
+            changed=False,
+            state=dict()
+        )
 
-def main():
-    """Main function"""
+        super(HwcVpcSubnet, self).__init__(self.argument_spec, supports_check_mode=True)
 
-    module = build_module()
-    config = Config(module, "vpc")
+    def exec_module(self, **kwargs):
 
-    try:
-        resource = None
-        if module.params['id']:
-            resource = True
+        self.results['check_mode'] = self.check_mode
+
+        try:
+            resource = None
+            if self.module.params['id']:
+                resource = True
+            else:
+                v = self.search_resource()
+                if len(v) > 1:
+                    raise Exception("find more than one resources(%s)" % ", ".join([
+                                    navigate_value(i, ["id"]) for i in v]))
+
+                if len(v) == 1:
+                    resource = v[0]
+                    self.module.params['id'] = navigate_value(resource, ["id"])
+
+            result = {}
+            changed = False
+            if self.module.params['state'] == 'present':
+                if resource is None:
+                    if not self.module.check_mode:
+                        self.create()
+                    changed = True
+
+                current = self.read()
+                self.log('subnet current: %s' % current)
+                expect = user_input_parameters(self.module)
+                self.log('subnet expect: %s' % expect)
+                if are_different_dicts(expect, current):
+                    if not self.module.check_mode:
+                        self.update(current)
+                    changed = True
+
+                result = self.read()
+                result['id'] = self.module.params.get('id')
+            else:
+                if resource:
+                    if not self.module.check_mode:
+                        self.delete()
+                        result['status'] = 'Deleted'
+                    changed = True
+
+        except Exception as ex:
+            self.module.fail_json(msg=str(ex))
+
         else:
-            v = search_resource(config)
-            if len(v) > 1:
-                raise Exception("find more than one resources(%s)" % ", ".join([
-                                navigate_value(i, ["id"]) for i in v]))
+            self.results['state'] = result
+            self.results['changed'] = changed
+            
+        return self.results
 
-            if len(v) == 1:
-                resource = v[0]
-                module.params['id'] = navigate_value(resource, ["id"])
+    def search_resource(self):
+        opts = user_input_parameters(self.module)
+        identity_obj = _build_identity_object(self.module, opts)
+        result = []
+        marker = ''
 
-        result = {}
-        changed = False
-        if module.params['state'] == 'present':
-            if resource is None:
-                if not module.check_mode:
-                    create(config)
-                changed = True
+        while True:
+            try:
+                request = ListSubnetsRequest(limit=10, marker=marker)
+                self.log('list subnet request: %s' % request)
+                response = self.vpc_client.list_subnets(request)
+                self.log('list subnet response: %s' % response)
+            except exceptions.ClientRequestException as e:
+                raise HwcModuleException(
+                        'search subnet failed: %s' % e.error_msg)
+            r = navigate_value(response.to_json_object(), ['subnets'], None)
 
-            current = read_resource(config, exclude_output=True)
-            expect = user_input_parameters(module)
-            if are_different_dicts(expect, current):
-                if not module.check_mode:
-                    update(config)
-                changed = True
+            if not r:
+                break
 
-            result = read_resource(config)
-            result['id'] = module.params.get('id')
+            for item in r:
+                item = fill_list_resp_body(item)
+                self.log('subnet identity_obj: %s' % identity_obj)
+                self.log('subnet item: %s' % item)
+                if not are_different_dicts(identity_obj, item):
+                    result.append(item)
+
+            if len(result) > 1:
+                break
+
+            marker = r[-1].get('id')
+
+        return result
+
+    def create(self):
+        opts = user_input_parameters(self.module)
+        timeout = 60 * int(self.module.params['timeouts']['create'].rstrip('m'))
+        try:
+            request_body = build_create_parameters(opts)
+            request = CreateSubnetRequest(request_body)
+            self.log('create subnet request body: %s' %request)
+            response = self.vpc_client.create_subnet(request)
+            self.log('create subnet response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Create subnet failed: %s' % e)
+
+        subnet_id = response.to_json_object()['subnet']['id']
+
+        obj = self.async_wait_create(subnet_id, timeout)
+
+        self.module.params['id'] = navigate_value(obj, ["subnet", "id"])
+
+        # set tags
+        if opts['tags']:
+            try:
+                request_body = build_tags_parameters(opts, 'create')
+                request = BatchCreateSubnetTagsRequest(self.module.params['id'], request_body)
+                self.log('create subnet tags request body: %s' %request)
+                response = self.vpc_client.batch_create_subnet_tags(request)
+                self.log('create subnet tags response body: %s' %request)
+            except exceptions.ClientRequestException as e:
+                self.fail('Create subnet tags failed: %s' % e)
+
+    def read(self):
+        try:
+            request = ShowSubnetRequest(self.module.params['id'])
+            self.log('read subnet request body: %s' %request)
+            response = self.vpc_client.show_subnet(request)
+            self.log('read subnet response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('read subnet failed: %s' % e)
+
+        response_attrs = update_properties(self.module, response.to_json_object()['subnet'])
+
+        # fetch vpc tags
+        try:
+            request = ShowSubnetTagsRequest(self.module.params['id'])
+            self.log('read subnet tags request body: %s' %request)
+            response = self.vpc_client.show_subnet_tags(request)
+            self.log('read subnet tags response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('read subnet tags failed: %s' % e)
+
+        tags_raw = response.to_json_object()['tags']
+        if len(tags_raw) > 0:
+            tags = tags_to_dict(tags_raw)
+            response_attrs['tags'] = tags
+
+        return (response_attrs)
+
+    def update(self, current):
+        opts = user_input_parameters(self.module)
+        try:
+            requset_body = build_update_parameters(opts)
+            request = UpdateSubnetRequest(self.module.params['vpc_id'], self.module.params['id'], requset_body)
+            self.log('Update subnet request body: %s' %request)
+            response = self.vpc_client.update_subnet(request)
+            self.log('Update subnet response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Update subnet failed: %s' % e)
+
+        # update tags
+        if opts['tags']:
+            if  'tags' not in current.keys():
+                try:
+                    request_body = build_tags_parameters(opts, 'create')
+                    request = BatchCreateSubnetTagsRequest(self.module.params['id'], request_body)
+                    self.log('create subnet tags request body: %s' %request)
+                    response = self.vpc_client.batch_create_Subnet_tags(request)
+                    self.log('create subnet tags response body: %s' %request)
+                except exceptions.ClientRequestException as e:
+                    self.fail('Create subnet tags failed: %s' % e)
+
+            elif current['tags'] != opts['tags']:
+                try:
+                    request_body = build_tags_parameters(current, 'delete')
+                    request = BatchDeleteSubnetTagsRequest(self.module.params['id'], request_body)
+                    self.log('delete subnet tags request body: %s' %request)
+                    response = self.vpc_client.batch_delete_subnet_tags(request)
+                    self.log('delete subnet tags response body: %s' % response)
+                except exceptions.ClientRequestException as e:
+                    self.fail('delete subnet tags failed: %s' % e)
+
+                try:
+                    request_body = build_tags_parameters(opts, 'create')
+                    request = BatchCreateSubnetTagsRequest(self.module.params['id'], request_body)
+                    self.log('create subnet tags request body: %s' %request)
+                    response = self.vpc_client.batch_create_subnet_tags(request)
+                    self.log('create subnet tags response body: %s' %request)
+                except exceptions.ClientRequestException as e:
+                    self.fail('Create subnet tags failed: %s' % e)
         else:
-            if resource:
-                if not module.check_mode:
-                    delete(config)
-                changed = True
+            if current['tags']:
+                try:
+                    request_body = build_tags_parameters(current, 'delete')
+                    request = BatchDeleteSubnetTagsRequest(self.module.params['id'], request_body)
+                    self.log('delete subnet tags request body: %s' %request)
+                    response = self.vpc_client.batch_delete_Subnet_tags(request)
+                    self.log('delete subnet tags response body: %s' % response)
+                except exceptions.ClientRequestException as e:
+                    self.fail('delete Subnet tags failed: %s' % e)
 
-    except Exception as ex:
-        module.fail_json(msg=str(ex))
+    def delete(self):
+        try:
+            request = DeleteSubnetRequest(self.module.params['vpc_id'], self.module.params['id'])
+            self.log('delete subnet request body: %s' %request)
+            response = self.vpc_client.delete_subnet(request)
+            self.log('delete subnet response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Delete subnet failed: %s' % e)
 
-    else:
-        result['changed'] = changed
-        module.exit_json(**result)
+    def async_wait_create(self, subnet_id, timeout):
+        def _query_status():
+            r = None
+            try:
+                request = ShowSubnetRequest(subnet_id)
+                self.log('read subnet request body: %s' %request)
+                response = self.vpc_client.show_subnet(request)
+                self.log('read subnet response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('read subnet failed: %s' % e)
 
+            r = response.to_json_object()
+
+            try:
+                s = navigate_value(r, ["subnet", "status"])
+                return r, s
+            except Exception:
+                return None, ""
+
+        try:
+            return wait_to_finish(
+                ["ACTIVE"],
+                ["UNKNOWN"],
+                _query_status, timeout)
+        except Exception as ex:
+            self.module.fail_json(msg="module(hwc_vpc_subnet): error "
+                                "waiting for api(create) to "
+                                "be done, error= %s" % str(ex))
+                                
 
 def user_input_parameters(module):
     return {
         "availability_zone": module.params.get("availability_zone"),
         "cidr": module.params.get("cidr"),
         "dhcp_enable": module.params.get("dhcp_enable"),
+        "ipv6_enable": module.params.get("ipv6_enable"),
         "dns_address": module.params.get("dns_address"),
         "gateway_ip": module.params.get("gateway_ip"),
         "name": module.params.get("name"),
         "vpc_id": module.params.get("vpc_id"),
+        'tags': module.params.get('tags'),
     }
-
-
-def create(config):
-    module = config.module
-    client = config.client(get_region(module), "vpc", "project")
-    timeout = 60 * int(module.params['timeouts']['create'].rstrip('m'))
-    opts = user_input_parameters(module)
-
-    params = build_create_parameters(opts)
-    r = send_create_request(module, params, client)
-    obj = async_wait_create(config, r, client, timeout)
-    module.params['id'] = navigate_value(obj, ["subnet", "id"])
-
-
-def update(config):
-    module = config.module
-    client = config.client(get_region(module), "vpc", "project")
-    timeout = 60 * int(module.params['timeouts']['update'].rstrip('m'))
-    opts = user_input_parameters(module)
-
-    params = build_update_parameters(opts)
-    if params:
-        r = send_update_request(module, params, client)
-        async_wait_update(config, r, client, timeout)
-
-
-def delete(config):
-    module = config.module
-    client = config.client(get_region(module), "vpc", "project")
-
-    send_delete_request(module, None, client)
-
-    url = build_path(module, "subnets/{id}")
-
-    def _refresh_status():
-        try:
-            client.get(url)
-        except HwcClientException404:
-            return True, "Done"
-
-        except Exception:
-            return None, ""
-
-        return True, "Pending"
-
-    timeout = 60 * int(module.params['timeouts']['create'].rstrip('m'))
-    try:
-        wait_to_finish(["Done"], ["Pending"], _refresh_status, timeout)
-    except Exception as ex:
-        module.fail_json(msg="module(hwc_vpc_subnet): error "
-                             "waiting for api(delete) to "
-                             "be done, error= %s" % str(ex))
-
-
-def read_resource(config, exclude_output=False):
-    module = config.module
-    client = config.client(get_region(module), "vpc", "project")
-
-    res = {}
-
-    r = send_read_request(module, client)
-    res["read"] = fill_read_resp_body(r)
-
-    return update_properties(module, res, None, exclude_output)
-
-
-def _build_query_link(opts):
-    query_link = "?marker={marker}&limit=10"
-    v = navigate_value(opts, ["vpc_id"])
-    if v:
-        query_link += "&vpc_id=" + str(v)
-
-    return query_link
-
-
-def search_resource(config):
-    module = config.module
-    client = config.client(get_region(module), "vpc", "project")
-    opts = user_input_parameters(module)
-    identity_obj = _build_identity_object(module, opts)
-    query_link = _build_query_link(opts)
-    link = "subnets" + query_link
-
-    result = []
-    p = {'marker': ''}
-    while True:
-        url = link.format(**p)
-        r = send_list_request(module, client, url)
-        if not r:
-            break
-
-        for item in r:
-            item = fill_list_resp_body(item)
-            if not are_different_dicts(identity_obj, item):
-                result.append(item)
-
-        if len(result) > 1:
-            break
-
-        p['marker'] = r[-1].get('id')
-
-    return result
 
 
 def build_create_parameters(opts):
@@ -376,6 +487,10 @@ def build_create_parameters(opts):
     v = navigate_value(opts, ["dhcp_enable"], None)
     if v is not None:
         params["dhcp_enable"] = v
+
+    v = navigate_value(opts, ["ipv6_enable"], None)
+    if v is not None:
+        params["ipv6_enable"] = v
 
     v = expand_create_dns_list(opts, None)
     if not is_empty_value(v):
@@ -423,56 +538,6 @@ def expand_create_secondary_dns(d, array_index):
     v = navigate_value(d, ["dns_address"], array_index)
     return v[1] if (v and len(v) > 1) else ""
 
-
-def send_create_request(module, params, client):
-    url = "subnets"
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_vpc_subnet): error running "
-               "api(create), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def async_wait_create(config, result, client, timeout):
-    module = config.module
-
-    path_parameters = {
-        "subnet_id": ["subnet", "id"],
-    }
-    data = {
-        key: navigate_value(result, path)
-        for key, path in path_parameters.items()
-    }
-
-    url = build_path(module, "subnets/{subnet_id}", data)
-
-    def _query_status():
-        r = None
-        try:
-            r = client.get(url, timeout=timeout)
-        except HwcClientException:
-            return None, ""
-
-        try:
-            s = navigate_value(r, ["subnet", "status"])
-            return r, s
-        except Exception:
-            return None, ""
-
-    try:
-        return wait_to_finish(
-            ["ACTIVE"],
-            ["UNKNOWN"],
-            _query_status, timeout)
-    except Exception as ex:
-        module.fail_json(msg="module(hwc_vpc_subnet): error "
-                             "waiting for api(create) to "
-                             "be done, error= %s" % str(ex))
-
-
 def build_update_parameters(opts):
     params = dict()
 
@@ -480,8 +545,12 @@ def build_update_parameters(opts):
     if v is not None:
         params["dhcp_enable"] = v
 
-    v = expand_update_dns_list(opts, None)
+    v = navigate_value(opts, ["ipv6_enable"], None)
     if v is not None:
+        params["ipv6_enable"] = v
+
+    v = expand_update_dns_list(opts, None)
+    if v is not None and v != []:
         params["dnsList"] = v
 
     v = navigate_value(opts, ["name"], None)
@@ -489,11 +558,11 @@ def build_update_parameters(opts):
         params["name"] = v
 
     v = expand_update_primary_dns(opts, None)
-    if v is not None:
+    if v is not None and v != "":
         params["primary_dns"] = v
 
     v = expand_update_secondary_dns(opts, None)
-    if v is not None:
+    if v is not None and v != "" :
         params["secondary_dns"] = v
 
     if not params:
@@ -512,165 +581,13 @@ def expand_update_dns_list(d, array_index):
         return None
     return []
 
-
 def expand_update_primary_dns(d, array_index):
     v = navigate_value(d, ["dns_address"], array_index)
     return v[0] if v else ""
 
-
 def expand_update_secondary_dns(d, array_index):
     v = navigate_value(d, ["dns_address"], array_index)
     return v[1] if (v and len(v) > 1) else ""
-
-
-def send_update_request(module, params, client):
-    url = build_path(module, "vpcs/{vpc_id}/subnets/{id}")
-
-    try:
-        r = client.put(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_vpc_subnet): error running "
-               "api(update), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def async_wait_update(config, result, client, timeout):
-    module = config.module
-
-    path_parameters = {
-        "subnet_id": ["subnet", "id"],
-    }
-    data = {
-        key: navigate_value(result, path)
-        for key, path in path_parameters.items()
-    }
-
-    url = build_path(module, "subnets/{subnet_id}", data)
-
-    def _query_status():
-        r = None
-        try:
-            r = client.get(url, timeout=timeout)
-        except HwcClientException:
-            return None, ""
-
-        try:
-            s = navigate_value(r, ["subnet", "status"])
-            return r, s
-        except Exception:
-            return None, ""
-
-    try:
-        return wait_to_finish(
-            ["ACTIVE"],
-            ["UNKNOWN"],
-            _query_status, timeout)
-    except Exception as ex:
-        module.fail_json(msg="module(hwc_vpc_subnet): error "
-                             "waiting for api(update) to "
-                             "be done, error= %s" % str(ex))
-
-
-def send_delete_request(module, params, client):
-    url = build_path(module, "vpcs/{vpc_id}/subnets/{id}")
-
-    try:
-        r = client.delete(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_vpc_subnet): error running "
-               "api(delete), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def send_read_request(module, client):
-    url = build_path(module, "subnets/{id}")
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_vpc_subnet): error running "
-               "api(read), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return navigate_value(r, ["subnet"], None)
-
-
-def fill_read_resp_body(body):
-    result = dict()
-
-    result["availability_zone"] = body.get("availability_zone")
-
-    result["cidr"] = body.get("cidr")
-
-    result["dhcp_enable"] = body.get("dhcp_enable")
-
-    result["dnsList"] = body.get("dnsList")
-
-    result["gateway_ip"] = body.get("gateway_ip")
-
-    result["id"] = body.get("id")
-
-    result["name"] = body.get("name")
-
-    result["neutron_network_id"] = body.get("neutron_network_id")
-
-    result["neutron_subnet_id"] = body.get("neutron_subnet_id")
-
-    result["primary_dns"] = body.get("primary_dns")
-
-    result["secondary_dns"] = body.get("secondary_dns")
-
-    result["status"] = body.get("status")
-
-    result["vpc_id"] = body.get("vpc_id")
-
-    return result
-
-
-def update_properties(module, response, array_index, exclude_output=False):
-    r = user_input_parameters(module)
-
-    v = navigate_value(response, ["read", "availability_zone"], array_index)
-    r["availability_zone"] = v
-
-    v = navigate_value(response, ["read", "cidr"], array_index)
-    r["cidr"] = v
-
-    v = navigate_value(response, ["read", "dhcp_enable"], array_index)
-    r["dhcp_enable"] = v
-
-    v = navigate_value(response, ["read", "dnsList"], array_index)
-    r["dns_address"] = v
-
-    v = navigate_value(response, ["read", "gateway_ip"], array_index)
-    r["gateway_ip"] = v
-
-    v = navigate_value(response, ["read", "name"], array_index)
-    r["name"] = v
-
-    v = navigate_value(response, ["read", "vpc_id"], array_index)
-    r["vpc_id"] = v
-
-    return r
-
-
-def send_list_request(module, client, url):
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_vpc_subnet): error running "
-               "api(list), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return navigate_value(r, ["subnets"], None)
-
 
 def _build_identity_object(module, all_opts):
     filters = module.params.get("filters")
@@ -688,6 +605,9 @@ def _build_identity_object(module, all_opts):
 
     v = navigate_value(opts, ["dhcp_enable"], None)
     result["dhcp_enable"] = v
+
+    v = navigate_value(opts, ["ipv6_enable"], None)
+    result["ipv6_enable"] = v
 
     v = navigate_value(opts, ["dns_address"], None)
     result["dnsList"] = v
@@ -725,6 +645,8 @@ def fill_list_resp_body(body):
 
     result["dhcp_enable"] = body.get("dhcp_enable")
 
+    result["ipv6_enable"] = body.get("ipv6_enable")
+
     result["dnsList"] = body.get("dnsList")
 
     result["gateway_ip"] = body.get("gateway_ip")
@@ -747,6 +669,38 @@ def fill_list_resp_body(body):
 
     return result
 
+def update_properties(module, response):
+    r = user_input_parameters(module)
+
+    if r["availability_zone"]:
+        v = navigate_value(response, ["availability_zone"])
+        r["availability_zone"] = v
+
+    v = navigate_value(response, ["cidr"], None)
+    r["cidr"] = v
+
+    v = navigate_value(response, ["dhcp_enable"], None)
+    r["dhcp_enable"] = v
+
+    v = navigate_value(response, ["ipv6_enable"], None)
+    r["ipv6_enable"] = v
+
+    v = navigate_value(response, ["dnsList"], None)
+    r["dns_address"] = v
+
+    v = navigate_value(response, ["gateway_ip"], None)
+    r["gateway_ip"] = v
+
+    v = navigate_value(response, ["name"], None)
+    r["name"] = v
+
+    v = navigate_value(response, ["vpc_id"], None)
+    r["vpc_id"] = v
+
+    return r
+
+def main():
+    HwcVpcSubnet()
 
 if __name__ == '__main__':
     main()
