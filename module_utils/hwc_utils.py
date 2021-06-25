@@ -2,194 +2,24 @@
 # Simplified BSD License (see licenses/simplified_bsd.txt or
 # https://opensource.org/licenses/BSD-2-Clause)
 
-import json
+import re
 import time
+import traceback
 
-from huaweicloudsdkcore.auth.credentials import BasicCredentials
-from huaweicloudsdkcore.http.http_config import HttpConfig
+THIRD_LIBRARIES_IMP_ERR = None
+try:
+    from keystoneauth1.adapter import Adapter
+    from keystoneauth1.identity import v3
+    from keystoneauth1 import session
+    HAS_THIRD_LIBRARIES = True
+except ImportError:
+    THIRD_LIBRARIES_IMP_ERR = traceback.format_exc()
+    HAS_THIRD_LIBRARIES = False
 
-from huaweicloudsdkvpc.v2 import VpcClient
-from huaweicloudsdkecs.v2 import EcsClient
-from huaweicloudsdkevs.v2 import EvsClient
-from huaweicloudsdkcce.v3 import CceClient
-
-
-from ansible.module_utils.basic import (AnsibleModule, env_fallback,)
+from ansible.module_utils.basic import (AnsibleModule, env_fallback,
+                                        missing_required_lib)
 from ansible.module_utils._text import to_text
-class HwcModuleBase(object):
-    def __init__(self, derived_arg_spec, no_log=False, supports_check_mode=False, skip_exec=False):
-        merged_arg_spec = dict()
 
-        merged_arg_spec.update(
-            dict(
-                region=dict(
-                    required=True, type='str',
-                    fallback=(env_fallback, ['ANSIBLE_HWC_REGION']),
-                ),
-                access_key=dict(
-                    required=True, type='str',
-                    fallback=(env_fallback, ['ANSIBLE_HWC_ACCESS_KEY']),
-                ),
-                secret_key=dict(
-                    required=True, type='str', no_log=True,
-                    fallback=(env_fallback, ['ANSIBLE_HWC_SECRET_KEY']),
-                ),
-                project_id=dict(
-                    type='str',
-                    fallback=(env_fallback, ['ANSIBLE_HWC_PROJECT_ID']),
-                ),
-                identity_endpoint=dict(
-                    type='str',
-                    fallback=(env_fallback, ['ANSIBLE_HWC_IDENTITY_ENDPOINT']),
-                ),
-                cloud=dict(
-                    default='myhuaweicloud.com',
-                    type='str',
-                    fallback=(env_fallback, ['ANSIBLE_HWC_CLOUD']),
-                ),
-                id=dict(type='str')
-            )
-        )
-
-        if derived_arg_spec:
-            merged_arg_spec.update(derived_arg_spec)
-
-        self.module = AnsibleModule(argument_spec=merged_arg_spec,
-                                    no_log=no_log,
-                                    supports_check_mode=supports_check_mode,)
-
-        self.check_mode = self.module.check_mode
-        self._vpc_client = None
-        self._ecs_client = None
-        self._evs_client = None
-        self._cce_client = None
-
-        if not skip_exec:
-            res = self.exec_module(**self.module.params)
-            self.module.exit_json(**res)
-
-
-    def exec_module(self, **kwargs):
-        self.fail("Error: {0} failed to implement exec_module method.".format(self.__class__.__name__))
-
-    def fail(self, msg, **kwargs):
-        '''
-        Shortcut for calling module.fail()
-        :param msg: Error message text.
-        :param kwargs: Any key=value pairs
-        :return: None
-        '''
-        self.module.fail_json(msg=msg, **kwargs)
-
-    def deprecate(self, msg, version=None):
-        self.module.deprecate(msg, version)
-
-    def log(self, msg, pretty_print=False):
-        # Use only during module development
-        
-        log_file = open('hwc_module.log', 'a')
-        if pretty_print:
-            log_file.write(json.dumps(msg, indent=4, sort_keys=True))
-        else:
-            log_file.write(msg + u'\n')
-
-    @property
-    def vpc_client(self):
-        self.log('Geting VPC client')
-        if not self._vpc_client:
-            config = HttpConfig.get_default_config()
-            config.ignore_ssl_verification = True
-            if self.module.params["project_id"]:
-                credentials = BasicCredentials(self.module.params["access_key"], self.module.params["secret_key"], self.module.params["project_id"])
-
-                if self.module.params["identity_endpoint"]:
-                    credentials.iam_endpoint = self.module.params["identity_endpoint"]
-
-                endpoint = 'https://vpc.{}.{}'.format(self.module.params["region"], self.module.params["cloud"])
-                self._vpc_client = VpcClient.new_builder() \
-                .with_http_config(config) \
-                .with_credentials(credentials) \
-                .with_endpoint(endpoint) \
-                .build()
-            else:
-                raise HwcModuleException(
-                        'Getting VPC client failed: "project_id" is required for VPC client')
-
-        return self._vpc_client
-
-    @property
-    def ecs_client(self):
-        self.log('Geting ECS client')
-        if not self._ecs_client:
-            config = HttpConfig.get_default_config()
-            config.ignore_ssl_verification = True
-            if self.module.params["project_id"]:
-                credentials = BasicCredentials(self.module.params["access_key"], self.module.params["secret_key"], self.module.params["project_id"])
-
-                if self.module.params["identity_endpoint"]:
-                    credentials.iam_endpoint = self.module.params["identity_endpoint"]
-
-                endpoint = 'https://ecs.{}.{}'.format(self.module.params["region"], self.module.params["cloud"])
-                self._ecs_client = EcsClient.new_builder() \
-                .with_http_config(config) \
-                .with_credentials(credentials) \
-                .with_endpoint(endpoint) \
-                .build()
-            else:
-                raise HwcModuleException(
-                        'Getting ECS client failed: "project_id" is required for ECS client')
-
-        return self._ecs_client
-
-    @property
-    def evs_client(self):
-        self.log('Geting EVS client')
-        if not self._evs_client:
-            config = HttpConfig.get_default_config()
-            config.ignore_ssl_verification = True
-            if self.module.params["project_id"]:
-                credentials = BasicCredentials(self.module.params["access_key"], self.module.params["secret_key"], self.module.params["project_id"])
-
-                if self.module.params["identity_endpoint"]:
-                    credentials.iam_endpoint = self.module.params["identity_endpoint"]
-
-                endpoint = 'https://evs.{}.{}'.format(self.module.params["region"], self.module.params["cloud"])
-                self._evs_client = EvsClient.new_builder() \
-                .with_http_config(config) \
-                .with_credentials(credentials) \
-                .with_endpoint(endpoint) \
-                .build()
-            else:
-                raise HwcModuleException(
-                        'Getting EVS client failed: "project_id" is required for EVS client')
-
-        return self._evs_client
-
-
-    @property
-    def cce_client(self):
-        self.log('Geting CCE client')
-        if not self._cce_client:
-            config = HttpConfig.get_default_config()
-            config.ignore_ssl_verification = True
-            if self.module.params["project_id"]:
-                credentials = BasicCredentials(self.module.params["access_key"], self.module.params["secret_key"], self.module.params["project_id"])
-
-                if self.module.params["identity_endpoint"]:
-                    credentials.iam_endpoint = self.module.params["identity_endpoint"]
-
-                endpoint = 'https://cce.{}.{}'.format(self.module.params["region"], self.module.params["cloud"])
-                self._cce_client = CceClient.new_builder() \
-                .with_http_config(config) \
-                .with_credentials(credentials) \
-                .with_endpoint(endpoint) \
-                .build()
-            else:
-                raise HwcModuleException(
-                        'Getting CCE client failed: "project_id" is required for CCE client')
-
-        return self._cce_client
-    
 
 class HwcModuleException(Exception):
     def __init__(self, message):
@@ -199,6 +29,223 @@ class HwcModuleException(Exception):
 
     def __str__(self):
         return "[HwcClientException] message=%s" % self._message
+
+
+class HwcClientException(Exception):
+    def __init__(self, code, message):
+        super(HwcClientException, self).__init__()
+
+        self._code = code
+        self._message = message
+
+    def __str__(self):
+        msg = " code=%s," % str(self._code) if self._code != 0 else ""
+        return "[HwcClientException]%s message=%s" % (
+            msg, self._message)
+
+
+class HwcClientException404(HwcClientException):
+    def __init__(self, message):
+        super(HwcClientException404, self).__init__(404, message)
+
+    def __str__(self):
+        return "[HwcClientException404] message=%s" % self._message
+
+
+def session_method_wrapper(f):
+    def _wrap(self, url, *args, **kwargs):
+        try:
+            url = self.endpoint + url
+            r = f(self, url, *args, **kwargs)
+        except Exception as ex:
+            raise HwcClientException(
+                0, "Sending request failed, error=%s" % ex)
+
+        result = None
+        if r.content:
+            try:
+                result = r.json()
+            except Exception as ex:
+                raise HwcClientException(
+                    0, "Parsing response to json failed, error: %s" % ex)
+
+        code = r.status_code
+        if code not in [200, 201, 202, 203, 204, 205, 206, 207, 208, 226]:
+            msg = ""
+            for i in ['message', 'error.message']:
+                try:
+                    msg = navigate_value(result, i)
+                    break
+                except Exception:
+                    pass
+            else:
+                msg = str(result)
+
+            if code == 404:
+                raise HwcClientException404(msg)
+
+            raise HwcClientException(code, msg)
+
+        return result
+
+    return _wrap
+
+
+class _ServiceClient(object):
+    def __init__(self, client, endpoint, product):
+        self._client = client
+        self._endpoint = endpoint
+        self._default_header = {
+            'User-Agent': "Huawei-Ansible-MM-%s" % product,
+            'Accept': 'application/json',
+        }
+
+    @property
+    def endpoint(self):
+        return self._endpoint
+
+    @session_method_wrapper
+    def get(self, url, body=None, header=None, timeout=None):
+        return self._client.get(url, json=body, timeout=timeout,
+                                headers=self._header(header))
+
+    @session_method_wrapper
+    def post(self, url, body=None, header=None, timeout=None):
+        return self._client.post(url, json=body, timeout=timeout,
+                                 headers=self._header(header))
+
+    @session_method_wrapper
+    def delete(self, url, body=None, header=None, timeout=None):
+        return self._client.delete(url, json=body, timeout=timeout,
+                                   headers=self._header(header))
+
+    @session_method_wrapper
+    def put(self, url, body=None, header=None, timeout=None):
+        return self._client.put(url, json=body, timeout=timeout,
+                                headers=self._header(header))
+
+    def _header(self, header):
+        if header and isinstance(header, dict):
+            for k, v in self._default_header.items():
+                if k not in header:
+                    header[k] = v
+        else:
+            header = self._default_header
+
+        return header
+
+
+class Config(object):
+    def __init__(self, module, product):
+        self._project_client = None
+        self._domain_client = None
+        self._module = module
+        self._product = product
+        self._endpoints = {}
+
+        self._validate()
+        self._gen_provider_client()
+
+    @property
+    def module(self):
+        return self._module
+
+    def client(self, region, service_type, service_level):
+        c = self._project_client
+        if service_level == "domain":
+            c = self._domain_client
+
+        e = self._get_service_endpoint(c, service_type, region)
+
+        return _ServiceClient(c, e, self._product)
+
+    def _gen_provider_client(self):
+        m = self._module
+        p = {
+            "auth_url": m.params['identity_endpoint'],
+            "password": m.params['password'],
+            "username": m.params['user'],
+            "project_name": m.params['project'],
+            "user_domain_name": m.params['domain'],
+            "reauthenticate": True
+        }
+
+        self._project_client = Adapter(
+            session.Session(auth=v3.Password(**p)),
+            raise_exc=False)
+
+        p.pop("project_name")
+        self._domain_client = Adapter(
+            session.Session(auth=v3.Password(**p)),
+            raise_exc=False)
+
+    def _get_service_endpoint(self, client, service_type, region):
+        k = "%s.%s" % (service_type, region if region else "")
+
+        if k in self._endpoints:
+            return self._endpoints.get(k)
+
+        url = None
+        try:
+            url = client.get_endpoint(service_type=service_type,
+                                      region_name=region, interface="public")
+        except Exception as ex:
+            raise HwcClientException(
+                0, "Getting endpoint failed, error=%s" % ex)
+
+        if url == "":
+            raise HwcClientException(
+                0, "Can not find the enpoint for %s" % service_type)
+
+        if url[-1] != "/":
+            url += "/"
+
+        self._endpoints[k] = url
+        return url
+
+    def _validate(self):
+        if not HAS_THIRD_LIBRARIES:
+            self.module.fail_json(
+                msg=missing_required_lib('keystoneauth1'),
+                exception=THIRD_LIBRARIES_IMP_ERR)
+
+
+class HwcModule(AnsibleModule):
+    def __init__(self, *args, **kwargs):
+        arg_spec = kwargs.setdefault('argument_spec', {})
+
+        arg_spec.update(
+            dict(
+                identity_endpoint=dict(
+                    required=True, type='str',
+                    fallback=(env_fallback, ['ANSIBLE_HWC_IDENTITY_ENDPOINT']),
+                ),
+                user=dict(
+                    required=True, type='str',
+                    fallback=(env_fallback, ['ANSIBLE_HWC_USER']),
+                ),
+                password=dict(
+                    required=True, type='str', no_log=True,
+                    fallback=(env_fallback, ['ANSIBLE_HWC_PASSWORD']),
+                ),
+                domain=dict(
+                    required=True, type='str',
+                    fallback=(env_fallback, ['ANSIBLE_HWC_DOMAIN']),
+                ),
+                project=dict(
+                    required=True, type='str',
+                    fallback=(env_fallback, ['ANSIBLE_HWC_PROJECT']),
+                ),
+                region=dict(
+                    type='str',
+                    fallback=(env_fallback, ['ANSIBLE_HWC_REGION']),
+                ),
+                id=dict(type='str')
+            )
+        )
+
+        super(HwcModule, self).__init__(*args, **kwargs)
+
 
 class _DictComparison(object):
     ''' This class takes in two dictionaries `a` and `b`.
@@ -351,27 +398,32 @@ def navigate_value(data, index, array_index=None):
 
     return d
 
-def build_tags_parameters(opts, action):
-    params = dict()
-    params['action'] = action
-    tags_raw = navigate_value(opts, ['tags'], None)
-    tags = []
-    for k, v in tags_raw.items():
-        tag = {
-            "key": k,
-            "value": v
-        }
-        tags.append(tag)
 
-    params['tags'] = tags
+def build_path(module, path, kv=None):
+    if kv is None:
+        kv = dict()
 
-    return params
+    v = {}
+    for p in re.findall(r"{[^/]*}", path):
+        n = p[1:][:-1]
 
-def tags_to_dict(tags_raw):
-    tags = {}
-    for tag_raw in tags_raw:
-        tags[tag_raw['key']] = tag_raw['value']
-    return tags
+        if n in kv:
+            v[n] = str(kv[n])
+
+        else:
+            if n in module.params:
+                v[n] = str(module.params.get(n))
+            else:
+                v[n] = ""
+
+    return path.format(**v)
+
+
+def get_region(module):
+    if module.params['region']:
+        return module.params['region']
+
+    return module.params['project'].split("_")[0]
 
 
 def is_empty_value(v):

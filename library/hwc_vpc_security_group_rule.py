@@ -25,8 +25,7 @@ short_description: Creates a resource of Vpc/SecurityGroupRule in Huawei Cloud
 version_added: '2.9'
 author: Huawei Inc. (@huaweicloud)
 requirements:
-    - huaweicloudsdkcore >= 3.0.47
-    - huaweicloudsdkvpc >= 3.0.47
+    - keystoneauth1 >= 3.6.0
 options:
     state:
         description:
@@ -120,7 +119,7 @@ EXAMPLES = '''
     protocol: "tcp"
     ethertype: "IPv4"
     port_range_max: 22
-    security_group_id: "{{ sg.state.id }}"
+    security_group_id: "{{ sg.id }}"
     port_range_min: 22
     filters:
       - "security_group_id"
@@ -191,19 +190,15 @@ RETURN = '''
         type: str
         returned: success
 '''
-from ansible.module_utils.hwc_utils import HwcModuleBase
-from ansible.module_utils.hwc_utils import HwcModuleException
-from ansible.module_utils.hwc_utils import are_different_dicts
-from ansible.module_utils.hwc_utils import navigate_value
-from ansible.module_utils.hwc_utils import is_empty_value
 
-from huaweicloudsdkcore.exceptions import exceptions
-from huaweicloudsdkvpc.v2 import *
+from ansible.module_utils.hwc_utils import (
+    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
+    get_region, is_empty_value, navigate_value)
 
 
-class HwcVpcSecGroupRule(HwcModuleBase):
-    def __init__(self):
-        self.argument_spec=dict(
+def build_module():
+    return HwcModule(
+        argument_spec=dict(
             state=dict(default='present', choices=['present', 'absent'],
                        type='str'),
             filters=dict(required=True, type='list', elements='str'),
@@ -216,128 +211,54 @@ class HwcVpcSecGroupRule(HwcModuleBase):
             protocol=dict(type='str'),
             remote_group_id=dict(type='str'),
             remote_ip_prefix=dict(type='str')
-        )
+        ),
+        supports_check_mode=True,
+    )
 
-        self.results = dict(
-            changed=False,
-            state=dict()
-        )
 
-        super(HwcVpcSecGroupRule, self).__init__(self.argument_spec, supports_check_mode=True)
+def main():
+    """Main function"""
 
-    def exec_module(self, **kwargs):
+    module = build_module()
+    config = Config(module, "vpc")
 
-        self.results['check_mode'] = self.check_mode
-
-        try:
-            resource = None
-            if self.module.params['id']:
-                resource = True
-            else:
-                v = self.search_resource()
-                if len(v) > 1:
-                    raise Exception("find more than one resources(%s)" % ", ".join([
-                                    navigate_value(i, ["id"]) for i in v]))
-
-                if len(v) == 1:
-                    resource = v[0]
-                    self.module.params['id'] = navigate_value(resource, ["id"])
-
-            result = {}
-            changed = False
-            if self.module.params['state'] == 'present':
-                if resource is None:
-                    if not self.module.check_mode:
-                        self.create()
-                    changed = True
-
-                result = self.read()
-                result['id'] = self.module.params.get('id')
-            else:
-                if resource:
-                    if not self.module.check_mode:
-                        self.delete()
-                        result['status'] = 'Deleted'
-                    changed = True
-
-        except Exception as ex:
-            self.module.fail_json(msg=str(ex))
-
+    try:
+        resource = None
+        if module.params['id']:
+            resource = True
         else:
-            self.results['changed'] = changed
-            self.results['state'] = result
+            v = search_resource(config)
+            if len(v) > 1:
+                raise Exception("find more than one resources(%s)" % ", ".join([
+                                navigate_value(i, ["id"]) for i in v]))
 
-        return self.results
+            if len(v) == 1:
+                resource = v[0]
+                module.params['id'] = navigate_value(resource, ["id"])
 
-    def search_resource(self):
-        opts = user_input_parameters(self.module)
-        identity_obj = _build_identity_object(self.module, opts)
-        result = []
-        marker = ''
+        result = {}
+        changed = False
+        if module.params['state'] == 'present':
+            if resource is None:
+                if not module.check_mode:
+                    create(config)
+                changed = True
 
-        while True:
-            try:
-                request = ListSecurityGroupRulesRequest(limit=10, marker=marker, security_group_id=self.module.params['security_group_id'])
-                self.log('list security group rules request: %s' % request)
-                response = self.vpc_client.list_security_group_rules(request)
-                self.log('list security group rules response: %s' % response)
-            except exceptions.ClientRequestException as e:
-                raise HwcModuleException(
-                        'search security group failed: %s' % e.error_msg)
-            r = navigate_value(response.to_json_object(), ['security_group_rules'], None)
+            result = read_resource(config)
+            result['id'] = module.params.get('id')
+        else:
+            if resource:
+                if not module.check_mode:
+                    delete(config)
+                changed = True
 
-            if not r:
-                break
+    except Exception as ex:
+        module.fail_json(msg=str(ex))
 
-            for item in r:
-                item = fill_list_resp_body(item)
-                self.log('security group identity_obj: %s' % identity_obj)
-                self.log('security group item: %s' % item)
-                if not are_different_dicts(identity_obj, item):
-                    result.append(item)
+    else:
+        result['changed'] = changed
+        module.exit_json(**result)
 
-            if len(result) > 1:
-                break
-
-            marker = r[-1].get('id')
-
-        return result
-
-    def create(self):
-        opts = user_input_parameters(self.module)
-        try:
-            request_body = build_create_parameters(opts)
-            request = CreateSecurityGroupRuleRequest(request_body)
-            self.log('create security group rule request body: %s' %request)
-            response = self.vpc_client.create_security_group_rule(request)
-            self.log('create security group rule response body: %s' % response)
-        except exceptions.ClientRequestException as e:
-            self.fail('Create security group rule failed: %s' % e)
-
-        self.module.params['id'] = response.to_json_object()['security_group_rule']['id']
-
-    def read(self):
-        try:
-            request = ShowSecurityGroupRuleRequest(self.module.params['id'])
-            self.log('read security group rule request body: %s' %request)
-            response = self.vpc_client.show_security_group_rule(request)
-            self.log('read security group rule response body: %s' % response)
-        except exceptions.ClientRequestException as e:
-            self.fail('read security group rule failed: %s' % e)
-
-        res = {}
-        res["read"] = fill_read_resp_body(response.to_json_object()['security_group_rule'])
-
-        return update_properties(self.module, res, None, exclude_output=False)
-
-    def delete(self):
-        try:
-            request = DeleteSecurityGroupRuleRequest(self.module.params['id'])
-            self.log('delete security group rule request body: %s' %request)
-            response = self.vpc_client.delete_security_group_rule(request)
-            self.log('delete security group rule response body: %s' % response)
-        except exceptions.ClientRequestException as e:
-            self.fail('Delete security group rule failed: %s' % e)
 
 def user_input_parameters(module):
     return {
@@ -351,6 +272,73 @@ def user_input_parameters(module):
         "remote_ip_prefix": module.params.get("remote_ip_prefix"),
         "security_group_id": module.params.get("security_group_id"),
     }
+
+
+def create(config):
+    module = config.module
+    client = config.client(get_region(module), "vpc", "project")
+    opts = user_input_parameters(module)
+
+    params = build_create_parameters(opts)
+    r = send_create_request(module, params, client)
+    module.params['id'] = navigate_value(r, ["security_group_rule", "id"])
+
+
+def delete(config):
+    module = config.module
+    client = config.client(get_region(module), "vpc", "project")
+
+    send_delete_request(module, None, client)
+
+
+def read_resource(config, exclude_output=False):
+    module = config.module
+    client = config.client(get_region(module), "vpc", "project")
+
+    res = {}
+
+    r = send_read_request(module, client)
+    res["read"] = fill_read_resp_body(r)
+
+    return update_properties(module, res, None, exclude_output)
+
+
+def _build_query_link(opts):
+    query_link = "?marker={marker}&limit=10"
+    v = navigate_value(opts, ["security_group_id"])
+    if v:
+        query_link += "&security_group_id=" + str(v)
+
+    return query_link
+
+
+def search_resource(config):
+    module = config.module
+    client = config.client(get_region(module), "vpc", "project")
+    opts = user_input_parameters(module)
+    identity_obj = _build_identity_object(module, opts)
+    query_link = _build_query_link(opts)
+    link = "security-group-rules" + query_link
+
+    result = []
+    p = {'marker': ''}
+    while True:
+        url = link.format(**p)
+        r = send_list_request(module, client, url)
+        if not r:
+            break
+
+        for item in r:
+            item = fill_list_resp_body(item)
+            if not are_different_dicts(identity_obj, item):
+                result.append(item)
+
+        if len(result) > 1:
+            break
+
+        p['marker'] = r[-1].get('id')
+
+    return result
 
 
 def build_create_parameters(opts):
@@ -398,6 +386,45 @@ def build_create_parameters(opts):
     params = {"security_group_rule": params}
 
     return params
+
+
+def send_create_request(module, params, client):
+    url = "security-group-rules"
+    try:
+        r = client.post(url, params)
+    except HwcClientException as ex:
+        msg = ("module(hwc_vpc_security_group_rule): error running "
+               "api(create), error: %s" % str(ex))
+        module.fail_json(msg=msg)
+
+    return r
+
+
+def send_delete_request(module, params, client):
+    url = build_path(module, "security-group-rules/{id}")
+
+    try:
+        r = client.delete(url, params)
+    except HwcClientException as ex:
+        msg = ("module(hwc_vpc_security_group_rule): error running "
+               "api(delete), error: %s" % str(ex))
+        module.fail_json(msg=msg)
+
+    return r
+
+
+def send_read_request(module, client):
+    url = build_path(module, "security-group-rules/{id}")
+
+    r = None
+    try:
+        r = client.get(url)
+    except HwcClientException as ex:
+        msg = ("module(hwc_vpc_security_group_rule): error running "
+               "api(read), error: %s" % str(ex))
+        module.fail_json(msg=msg)
+
+    return navigate_value(r, ["security_group_rule"], None)
 
 
 def fill_read_resp_body(body):
@@ -459,6 +486,19 @@ def update_properties(module, response, array_index, exclude_output=False):
     r["security_group_id"] = v
 
     return r
+
+
+def send_list_request(module, client, url):
+
+    r = None
+    try:
+        r = client.get(url)
+    except HwcClientException as ex:
+        msg = ("module(hwc_vpc_security_group_rule): error running "
+               "api(list), error: %s" % str(ex))
+        module.fail_json(msg=msg)
+
+    return navigate_value(r, ["security_group_rules"], None)
 
 
 def _build_identity_object(module, all_opts):
@@ -530,9 +570,6 @@ def fill_list_resp_body(body):
 
     return result
 
-
-def main():
-    HwcVpcSecGroupRule()
 
 if __name__ == '__main__':
     main()
