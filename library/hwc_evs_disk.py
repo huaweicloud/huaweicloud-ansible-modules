@@ -331,14 +331,21 @@ RETURN = '''
         returned: success
 '''
 
-from ansible.module_utils.hwc_utils import (
-    Config, HwcClientException, HwcModule, are_different_dicts, build_path,
-    get_region, is_empty_value, navigate_value, wait_to_finish)
+from ansible.module_utils.hwc_utils import HwcModuleBase
+from ansible.module_utils.hwc_utils import HwcModuleException
+from ansible.module_utils.hwc_utils import are_different_dicts
+from ansible.module_utils.hwc_utils import navigate_value
+from ansible.module_utils.hwc_utils import is_empty_value
+from ansible.module_utils.hwc_utils import wait_to_finish
+
+from huaweicloudsdkcore.exceptions import exceptions
+from huaweicloudsdkevs.v2 import *
 
 
-def build_module():
-    return HwcModule(
-        argument_spec=dict(
+
+class HwcEvsDisk(HwcModuleBase):
+    def __init__(self):
+        self.argument_spec=dict(
             state=dict(default='present', choices=['present', 'absent'],
                        type='str'),
             filters=dict(required=True, type='list', elements='str'),
@@ -360,78 +367,223 @@ def build_module():
             image_id=dict(type='str'),
             size=dict(type='int'),
             snapshot_id=dict(type='str')
-        ),
-        supports_check_mode=True,
-    )
+        )
 
+        self.results = dict(
+            changed=False,
+            state=dict()
+        )
 
-def main():
-    """Main function"""
+        super(HwcEvsDisk, self).__init__(self.argument_spec, supports_check_mode=True)
 
-    module = build_module()
-    config = Config(module, "evs")
+    def exec_module(self, **kwargs):
 
-    try:
-        _init(config)
-        is_exist = module.params['id']
+        self.results['check_mode'] = self.check_mode
 
-        result = None
-        changed = False
-        if module.params['state'] == 'present':
-            if not is_exist:
-                if not module.check_mode:
-                    create(config)
-                changed = True
+        try:
+            resource = None
+            if self.module.params['id']:
+                resource = True
+            else:
+                v = self.search_resource()
+                if len(v) > 1:
+                    raise Exception("find more than one resources(%s)" % ", ".join([
+                                    navigate_value(i, ["id"]) for i in v]))
 
-            inputv = user_input_parameters(module)
-            resp, array_index = read_resource(config)
-            result = build_state(inputv, resp, array_index)
-            set_readonly_options(inputv, result)
-            if are_different_dicts(inputv, result):
-                if not module.check_mode:
-                    update(config, inputv, result)
+                if len(v) == 1:
+                    resource = v[0]
+                    self.module.params['id'] = navigate_value(resource, ["id"])
 
-                    inputv = user_input_parameters(module)
-                    resp, array_index = read_resource(config)
-                    result = build_state(inputv, resp, array_index)
-                    set_readonly_options(inputv, result)
-                    if are_different_dicts(inputv, result):
-                        raise Exception("Update resource failed, "
-                                        "some attributes are not updated")
+            result = {}
+            changed = False
 
-                changed = True
+            if self.module.params['state'] == 'present':
+                if not resource:
+                    if not self.module.check_mode:
+                        self.create()
+                    changed = True
 
-            result['id'] = module.params.get('id')
+                inputv = user_input_parameters(self.module)
+                resp, array_index = self.read()
+                result = build_state(inputv, resp, array_index)
+                set_readonly_options(inputv, result)
+                if are_different_dicts(inputv, result):
+                    if not self.module.check_mode:
+                        self.update(inputv, result)
+                        inputv = user_input_parameters(self.module)
+                        resp, array_index = self.read()
+                        result = build_state(inputv, resp, array_index)
+                        set_readonly_options(inputv, result)
+                        if are_different_dicts(inputv, result):
+                            raise Exception("Update resource failed, "
+                                            "some attributes are not updated")
+
+                    changed = True
+
+                result['id'] = self.module.params.get('id')
+            else:
+                result = dict()
+                if resource:
+                    if not self.module.check_mode:
+                        self.delete()
+                        result['status'] = 'Deleted'
+                    changed = True
+
+        except Exception as ex:
+            self.module.fail_json(msg=str(ex))
+
         else:
-            result = dict()
-            if is_exist:
-                if not module.check_mode:
-                    delete(config)
-                changed = True
+            self.results['state'] = result
+            self.results['changed'] = changed
 
-    except Exception as ex:
-        module.fail_json(msg=str(ex))
-
-    else:
-        result['changed'] = changed
-        module.exit_json(**result)
+        return self.results
 
 
-def _init(config):
-    module = config.module
-    if module.params['id']:
-        return
+    def search_resource(self):
+        opts = user_input_parameters(self.module)
+        identity_obj = _build_identity_object(self.module, opts)
 
-    v = search_resource(config)
-    n = len(v)
-    if n > 1:
-        raise Exception("find more than one resources(%s)" % ", ".join([
-            navigate_value(i, ["id"])
-            for i in v
-        ]))
+        result = []
+        marker = ''
 
-    if n == 1:
-        module.params['id'] = navigate_value(v[0], ["id"])
+        while True:
+            try:
+                request = ListVolumesRequest(limit=10, marker=marker)
+                self.log('list evs disk request: %s' % request)
+                response = self.evs_client.list_volumes(request)
+                self.log('list evs disk response: %s' % response)
+            except exceptions.ClientRequestException as e:
+                raise HwcModuleException(
+                        'search evs disk failed: %s' % e.error_msg)
+            r = navigate_value(response.to_json_object(), ['volumes'], None)
+
+            if not r:
+                break
+
+            for item in r:
+                item = fill_list_resp_body(item)
+                self.log('evs disk identity_obj: %s' % identity_obj)
+                self.log('evs disk item: %s' % item)
+                if not are_different_dicts(identity_obj, item):
+                    result.append(item)
+
+            if len(result) > 1:
+                break
+
+            marker = r[-1].get('id')
+
+        return result
+
+
+    def create(self):
+        timeout = 60 * int(self.module.params['timeouts']['create'].rstrip('m'))
+        opts = user_input_parameters(self.module)
+
+        try:
+            request_body = build_create_parameters(opts)
+            request = CreateVolumeRequest(request_body)
+            self.log('create evs disk request body: %s' %request)
+            response = self.evs_client.create_volume(request)
+            self.log('create evs disk response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Create evs disk failed: %s' % e)
+
+        job_id = response.to_json_object()['job_id']
+
+        obj = self.async_wait(job_id, timeout)
+
+        self.module.params['id'] = navigate_value(obj, ["entities", "volume_id"])
+
+
+    def read(self):
+        try:
+            request = ShowVolumeRequest(self.module.params['id'])
+            self.log('read evs disk request body: %s' %request)
+            response = self.evs_client.show_volume(request)
+            self.log('read evs disk response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('read evs disk failed: %s' % e)
+
+        r = response.to_json_object()['volume']
+        res = {}
+        res["read"] = fill_read_resp_body(r)
+
+        return res, None
+
+    def update(self, expect_state, current_state):
+        expect_state["current_state"] = current_state
+        current_state["current_state"] = current_state
+        timeout = 60 * int(self.module.params['timeouts']['update'].rstrip('m'))
+
+        params = build_update_parameters(expect_state)
+        params1 = build_update_parameters(current_state)
+        if params and are_different_dicts(params, params1):
+            try:
+                request = UpdateVolumeRequest(self.module.params['id'], params)
+                self.log('Update evs disk request body: %s' %request)
+                response = self.evs_client.update_volume(request)
+                self.log('Update evs disk response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('Update evs disk failed: %s' % e)
+
+        params = build_extend_disk_parameters(expect_state)
+        params1 = build_extend_disk_parameters(current_state)
+        if params and are_different_dicts(params, params1):
+            try:
+                request = ResizeVolumeRequest(self.module.params['id'], params)
+                self.log('Resize evs disk request body: %s' %request)
+                response = self.evs_client.resize_volume(request)
+                self.log('Resize evs disk response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('Resize evs disk failed: %s' % e)
+
+            job_id = response.to_json_object()['job_id']
+            self.async_wait(job_id, timeout)
+
+
+    def delete(self):
+        timeout = 60 * int(self.module.params['timeouts']['delete'].rstrip('m'))
+
+        try:
+            request = DeleteVolumeRequest(self.module.params['id'])
+            self.log('delete evs disk request body: %s' %request)
+            response = self.evs_client.delete_volume(request)
+            self.log('delete evs disk response body: %s' % response)
+        except exceptions.ClientRequestException as e:
+            self.fail('Delete evs disk failed: %s' % e)
+
+        job_id = response.to_json_object()['job_id']
+
+        self.async_wait(job_id, timeout)
+
+
+    def async_wait(self, job_id, timeout):
+        def _query_status():
+            r = None
+            try:
+                request = ShowJobRequest(job_id)
+                self.log('show job request body: %s' %request)
+                response = self.evs_client.show_job(request)
+                self.log('show job response body: %s' % response)
+            except exceptions.ClientRequestException as e:
+                self.fail('show job failed: %s' % e)
+
+            r = response.to_json_object()
+
+            try:
+                s = navigate_value(r, ["status"])
+                return r, s
+            except Exception:
+                return None, ""
+
+        try:
+            return wait_to_finish(
+                ["SUCCESS"],
+                ["RUNNING", "INIT"],
+                _query_status, timeout)
+        except Exception as ex:
+            self.module.fail_json(msg="module(hwc_evs_disk): error "
+                                "waiting to be done, error= %s" % str(ex))
 
 
 def user_input_parameters(module):
@@ -452,127 +604,10 @@ def user_input_parameters(module):
     }
 
 
-def create(config):
-    module = config.module
-    client = config.client(get_region(module), "volumev3", "project")
-    timeout = 60 * int(module.params['timeouts']['create'].rstrip('m'))
-    opts = user_input_parameters(module)
-    opts["ansible_module"] = module
-
-    params = build_create_parameters(opts)
-    r = send_create_request(module, params, client)
-
-    client1 = config.client(get_region(module), "volume", "project")
-    client1.endpoint = client1.endpoint.replace("/v2/", "/v1/")
-    obj = async_wait(config, r, client1, timeout)
-    module.params['id'] = navigate_value(obj, ["entities", "volume_id"])
-
-
-def update(config, expect_state, current_state):
-    module = config.module
-    expect_state["current_state"] = current_state
-    current_state["current_state"] = current_state
-    client = config.client(get_region(module), "evs", "project")
-    timeout = 60 * int(module.params['timeouts']['update'].rstrip('m'))
-
-    params = build_update_parameters(expect_state)
-    params1 = build_update_parameters(current_state)
-    if params and are_different_dicts(params, params1):
-        send_update_request(module, params, client)
-
-    params = build_extend_disk_parameters(expect_state)
-    params1 = build_extend_disk_parameters(current_state)
-    if params and are_different_dicts(params, params1):
-        client1 = config.client(get_region(module), "evsv2.1", "project")
-        r = send_extend_disk_request(module, params, client1)
-
-        client1 = config.client(get_region(module), "volume", "project")
-        client1.endpoint = client1.endpoint.replace("/v2/", "/v1/")
-        async_wait(config, r, client1, timeout)
-
-
-def delete(config):
-    module = config.module
-    client = config.client(get_region(module), "evs", "project")
-    timeout = 60 * int(module.params['timeouts']['delete'].rstrip('m'))
-
-    r = send_delete_request(module, None, client)
-
-    client = config.client(get_region(module), "volume", "project")
-    client.endpoint = client.endpoint.replace("/v2/", "/v1/")
-    async_wait(config, r, client, timeout)
-
-
-def read_resource(config):
-    module = config.module
-    client = config.client(get_region(module), "volumev3", "project")
-
-    res = {}
-
-    r = send_read_request(module, client)
-    res["read"] = fill_read_resp_body(r)
-
-    return res, None
-
-
 def build_state(opts, response, array_index):
     states = flatten_options(response, array_index)
     set_unreadable_options(opts, states)
     return states
-
-
-def _build_query_link(opts):
-    query_params = []
-
-    v = navigate_value(opts, ["enable_share"])
-    if v or v in [False, 0]:
-        query_params.append(
-            "multiattach=" + (str(v) if v else str(v).lower()))
-
-    v = navigate_value(opts, ["name"])
-    if v or v in [False, 0]:
-        query_params.append(
-            "name=" + (str(v) if v else str(v).lower()))
-
-    v = navigate_value(opts, ["availability_zone"])
-    if v or v in [False, 0]:
-        query_params.append(
-            "availability_zone=" + (str(v) if v else str(v).lower()))
-
-    query_link = "?limit=10&offset={start}"
-    if query_params:
-        query_link += "&" + "&".join(query_params)
-
-    return query_link
-
-
-def search_resource(config):
-    module = config.module
-    client = config.client(get_region(module), "volumev3", "project")
-    opts = user_input_parameters(module)
-    identity_obj = _build_identity_object(module, opts)
-    query_link = _build_query_link(opts)
-    link = "os-vendor-volumes/detail" + query_link
-
-    result = []
-    p = {'start': 0}
-    while True:
-        url = link.format(**p)
-        r = send_list_request(module, client, url)
-        if not r:
-            break
-
-        for item in r:
-            item = fill_list_resp_body(item)
-            if not are_different_dicts(identity_obj, item):
-                result.append(item)
-
-        if len(result) > 1:
-            break
-
-        p['start'] += len(r)
-
-    return result
 
 
 def build_create_parameters(opts):
@@ -669,18 +704,6 @@ def expand_create_metadata_hw_passthrough(d, array_index):
     return "true" if v else "false"
 
 
-def send_create_request(module, params, client):
-    url = "cloudvolumes"
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_evs_disk): error running "
-               "api(create), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
 def build_update_parameters(opts):
     params = dict()
 
@@ -698,32 +721,6 @@ def build_update_parameters(opts):
     params = {"volume": params}
 
     return params
-
-
-def send_update_request(module, params, client):
-    url = build_path(module, "cloudvolumes/{id}")
-
-    try:
-        r = client.put(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_evs_disk): error running "
-               "api(update), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def send_delete_request(module, params, client):
-    url = build_path(module, "cloudvolumes/{id}")
-
-    try:
-        r = client.delete(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_evs_disk): error running "
-               "api(delete), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
 
 
 def build_extend_disk_parameters(opts):
@@ -744,69 +741,6 @@ def expand_extend_disk_os_extend(d, array_index):
         r["new_size"] = v
 
     return r
-
-
-def send_extend_disk_request(module, params, client):
-    url = build_path(module, "cloudvolumes/{id}/action")
-
-    try:
-        r = client.post(url, params)
-    except HwcClientException as ex:
-        msg = ("module(hwc_evs_disk): error running "
-               "api(extend_disk), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return r
-
-
-def async_wait(config, result, client, timeout):
-    module = config.module
-
-    path_parameters = {
-        "job_id": ["job_id"],
-    }
-    data = {
-        key: navigate_value(result, path)
-        for key, path in path_parameters.items()
-    }
-
-    url = build_path(module, "jobs/{job_id}", data)
-
-    def _query_status():
-        r = None
-        try:
-            r = client.get(url, timeout=timeout)
-        except HwcClientException:
-            return None, ""
-
-        try:
-            s = navigate_value(r, ["status"])
-            return r, s
-        except Exception:
-            return None, ""
-
-    try:
-        return wait_to_finish(
-            ["SUCCESS"],
-            ["RUNNING", "INIT"],
-            _query_status, timeout)
-    except Exception as ex:
-        module.fail_json(msg="module(hwc_evs_disk): error "
-                             "waiting to be done, error= %s" % str(ex))
-
-
-def send_read_request(module, client):
-    url = build_path(module, "os-vendor-volumes/{id}")
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_evs_disk): error running "
-               "api(read), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return navigate_value(r, ["volume"], None)
 
 
 def fill_read_resp_body(body):
@@ -1064,19 +998,6 @@ def set_readonly_options(opts, states):
     opts["tags"] = states.get("tags")
 
 
-def send_list_request(module, client, url):
-
-    r = None
-    try:
-        r = client.get(url)
-    except HwcClientException as ex:
-        msg = ("module(hwc_evs_disk): error running "
-               "api(list), error: %s" % str(ex))
-        module.fail_json(msg=msg)
-
-    return navigate_value(r, ["volumes"], None)
-
-
 def _build_identity_object(module, all_opts):
     filters = module.params.get("filters")
     opts = dict()
@@ -1262,6 +1183,10 @@ def fill_list_resp_volume_image_metadata(value):
     result["id"] = value.get("id")
 
     return result
+
+
+def main():
+    HwcEvsDisk()
 
 
 if __name__ == '__main__':
