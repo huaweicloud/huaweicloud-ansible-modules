@@ -13,7 +13,6 @@ from huaweicloudsdkecs.v2 import EcsClient
 from huaweicloudsdkevs.v2 import EvsClient
 from huaweicloudsdkcce.v3 import CceClient
 
-
 from ansible.module_utils.basic import (AnsibleModule, env_fallback,)
 from ansible.module_utils._text import to_text
 class HwcModuleBase(object):
