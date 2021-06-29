@@ -85,13 +85,14 @@ class HwcModuleBase(object):
 
     def log(self, msg, pretty_print=False):
         # Use only during module development
-        
-        log_file = open('hwc_module.log', 'a')
-        if pretty_print:
-            log_file.write(json.dumps(msg, indent=4, sort_keys=True))
-        else:
-            log_file.write(msg + u'\n')
+        pass
 
+        # log_file = open('hwc_module.log', 'a')
+        # if pretty_print:
+        #     log_file.write(json.dumps(msg, indent=4, sort_keys=True))
+        # else:
+        #     log_file.write(msg + u'\n')
+        
     @property
     def vpc_client(self):
         self.log('Geting VPC client')
