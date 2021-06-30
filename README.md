@@ -28,12 +28,12 @@ Example Playbook
         - { role: huaweicloud.huaweicloud_ansible_modules }
       tasks:
 		- name: create a new vpc
-		  hwc_network_vpc:
+		  hwc_vpc:
 			identity_endpoint: "https://iam.cn-north-1.myhwclouds.com/v3"
-			user: "{{ user_name }}"
-			password: "{{ password }}"
-			domain: "{{ domain_name }}"
-			project: "{{ project_name }}"
+			cloud: "myhwclouds.com"
+			access_key: "{{ access_key }}"
+			secret_key: "{{ secret_key }}"
+			project_id: "{{ project_id }}"
 			region: "{{ region }}"
 
 			name: "{{ vpc_name }}"
