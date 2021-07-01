@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Huawei
@@ -22,8 +22,6 @@ from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdkcore.http.http_config import HttpConfig
-from ansible.module_utils.hwc_utils import navigate_value
-from ansible.module_utils.hwc_utils import HwcModuleException
 
 
 class EcsInventory(object):
@@ -262,7 +260,7 @@ class EcsInventory(object):
             except exceptions.ClientRequestException as e:
                 raise HwcModuleException(
                         'search ecs failed: %s' % e.error_msg)
-            insts = navigate_value(response.to_json_object(), ['servers'], None)
+            insts = self.navigate_value(response.to_json_object(), ['servers'], None)
 
             if not insts:
                 break
@@ -298,7 +296,7 @@ class EcsInventory(object):
 
         # Select the best destination address
         if self.destination_variable:
-            nics = navigate_value(instance, ['addresses'], None)
+            nics = self.navigate_value(instance, ['addresses'], None)
 
             for id, addresses in nics.items():
                 for address in addresses:
@@ -324,7 +322,7 @@ class EcsInventory(object):
         # Set the inventory name
         hostname = None
         if self.hostname_variable:
-            hostname = navigate_value(instance, [self.hostname_variable], None)
+            hostname = self.navigate_value(instance, [self.hostname_variable], None)
 
         # If we can't get a nice hostname, use the destination address
         if not hostname:
@@ -474,6 +472,57 @@ class EcsInventory(object):
             return json.dumps(data, sort_keys=True, indent=2)
         else:
             return json.dumps(data)
+
+    def navigate_value(self, data, index, array_index=None):
+        if array_index and (not isinstance(array_index, dict)):
+            raise HwcModuleException("array_index must be dict")
+
+        d = data
+        for n in range(len(index)):
+            if d is None:
+                return None
+
+            if not isinstance(d, dict):
+                raise HwcModuleException(
+                    "can't navigate value from a non-dict object")
+
+            i = index[n]
+            if i not in d:
+                raise HwcModuleException(
+                    "navigate value failed: key(%s) is not exist in dict" % i)
+            d = d[i]
+
+            if not array_index:
+                continue
+
+            k = ".".join(index[: (n + 1)])
+            if k not in array_index:
+                continue
+
+            if d is None:
+                return None
+
+            if not isinstance(d, list):
+                raise HwcModuleException(
+                    "can't navigate value from a non-list object")
+
+            j = array_index.get(k)
+            if j >= len(d):
+                raise HwcModuleException(
+                    "navigate value failed: the index is out of list")
+            d = d[j]
+
+        return d
+
+
+class HwcModuleException(Exception):
+    def __init__(self, message):
+        super(HwcModuleException, self).__init__()
+
+        self._message = message
+
+    def __str__(self):
+        return "[HwcException] message=%s" % self._message
 
 
 if __name__ == '__main__':
