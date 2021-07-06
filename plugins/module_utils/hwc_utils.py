@@ -15,8 +15,11 @@ from huaweicloudsdkcce.v3 import CceClient
 
 from ansible.module_utils.basic import (AnsibleModule, env_fallback,)
 from ansible.module_utils._text import to_text
+
+
 class HwcModuleBase(object):
-    def __init__(self, derived_arg_spec, no_log=False, supports_check_mode=False, skip_exec=False):
+    def __init__(self, derived_arg_spec, no_log=False,
+                 supports_check_mode=False, skip_exec=False):
         merged_arg_spec = dict()
 
         merged_arg_spec.update(
@@ -66,7 +69,6 @@ class HwcModuleBase(object):
         if not skip_exec:
             res = self.exec_module(**self.module.params)
             self.module.exit_json(**res)
-
 
     def exec_module(self, **kwargs):
         self.fail("Error: {0} failed to implement exec_module method.".format(self.__class__.__name__))
@@ -189,7 +191,7 @@ class HwcModuleBase(object):
                         'Getting CCE client failed: "project_id" is required for CCE client')
 
         return self._cce_client
-    
+
 
 class HwcModuleException(Exception):
     def __init__(self, message):
@@ -199,6 +201,7 @@ class HwcModuleException(Exception):
 
     def __str__(self):
         return "[HwcClientException] message=%s" % self._message
+
 
 class _DictComparison(object):
     ''' This class takes in two dictionaries `a` and `b`.
@@ -351,6 +354,7 @@ def navigate_value(data, index, array_index=None):
 
     return d
 
+
 def build_tags_parameters(opts, action):
     params = dict()
     params['action'] = action
@@ -366,6 +370,7 @@ def build_tags_parameters(opts, action):
     params['tags'] = tags
 
     return params
+
 
 def tags_to_dict(tags_raw):
     tags = {}

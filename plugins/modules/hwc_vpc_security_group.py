@@ -160,11 +160,11 @@ RETURN = '''
                 returned: success
 '''
 
-from ansible.module_utils.hwc_utils import HwcModuleBase
-from ansible.module_utils.hwc_utils import HwcModuleException
-from ansible.module_utils.hwc_utils import are_different_dicts
-from ansible.module_utils.hwc_utils import navigate_value
-from ansible.module_utils.hwc_utils import is_empty_value
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import HwcModuleBase
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import HwcModuleException
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import are_different_dicts
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import navigate_value
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import is_empty_value
 
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkvpc.v2 import *

@@ -300,7 +300,6 @@ class EcsInventory(object):
         # Select the best destination address
         if self.destination_variable:
             nics = self.navigate_value(instance, ['addresses'], None)
-
             fixed_ip = None
             eip = None
 
