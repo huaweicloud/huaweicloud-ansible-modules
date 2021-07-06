@@ -226,7 +226,7 @@ class EcsInventory(object):
         self.log('Geting ECS client')
         config = HttpConfig.get_default_config()
         config.ignore_ssl_verification = True
-        if self.credentials["project_id"]:
+        if self.credentials["project_id"] and self.credentials["access_key"] and self.credentials["secret_key"] and region:
             _credentials = BasicCredentials(self.credentials["access_key"], self.credentials["secret_key"], self.credentials["project_id"])
 
             if self.credentials["identity_endpoint"]:
@@ -243,7 +243,7 @@ class EcsInventory(object):
             .build()
         else:
             raise HwcModuleException(
-                    'Getting ECS client failed: "project_id" is required for ECS client')
+                    'Getting ECS client failed: "project_id", "access_key", "access_key" and "region" are required for ECS client')
 
         return ecs_client
 
