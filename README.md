@@ -1,22 +1,33 @@
-huaweicloud.huaweicloud_ansible_modules
-=========
+# Ansible Collection for Huaweicloud
 
-This role includes the latest changes and bug fixes for HuaweiCloud modules from the `devel` branch of [Ansible repository](https://github.com/ansible/ansible). If you cannot wait for Ansible's next release, installing this role is a good choice. 
+This collection includes a series of Ansible modules for interacting with Huaweicloud.
 
 Prerequisite
 ------------
 
-The usage of this playbook role assumes that you've already setup an Ansible environment for HuaweiCloud.
+The usage of this collection assumes that you've already setup an Ansible environment for HuaweiCloud.
 
 [Installed the ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) in your environment.
 
 Installation
 ------------
 
-Install the role.
+Install dependencies.
+
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+Install the collection.
 
   ``` bash
-  $ ansible-galaxy install huaweicloud.huaweicloud_ansible_modules
+  $ ansible-galaxy collection install hwceco.hwcollection
+  ```
+
+Upgrade to the lastet version of the collection.
+
+  ``` bash
+  $ ansible-galaxy collection install hwceco.hwcollection --force
   ```
 
 Example Playbook
@@ -24,8 +35,8 @@ Example Playbook
 
     $ cat test.yml
     - hosts: localhost
-      roles:
-        - { role: huaweicloud.huaweicloud_ansible_modules }
+      collections:
+        - hwceco.hwcollection
       tasks:
 		- name: create a new vpc
 		  hwc_vpc:

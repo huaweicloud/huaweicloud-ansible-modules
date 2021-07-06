@@ -21,7 +21,7 @@ import os
 import sys
 
 from units.compat import unittest
-from ansible.module_utils.hwc_utils import DictComparison
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import DictComparison
 
 
 class HwcDictComparisonTestCase(unittest.TestCase):

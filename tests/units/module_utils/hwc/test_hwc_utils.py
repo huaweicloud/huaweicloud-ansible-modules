@@ -4,7 +4,7 @@ import os
 import sys
 
 from units.compat import unittest
-from ansible.module_utils.hwc_utils import (navigate_hash,
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import (navigate_hash,
                                             remove_empty_from_dict,
                                             remove_nones_from_dict,
                                             replace_resource_dict)

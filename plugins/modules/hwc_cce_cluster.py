@@ -347,12 +347,13 @@ RETURN = '''
         returned: success
 '''
 
-from ansible.module_utils.hwc_utils import HwcModuleBase
-from ansible.module_utils.hwc_utils import HwcModuleException
-from ansible.module_utils.hwc_utils import are_different_dicts
-from ansible.module_utils.hwc_utils import navigate_value
-from ansible.module_utils.hwc_utils import is_empty_value
-from ansible.module_utils.hwc_utils import wait_to_finish
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import HwcModuleBase
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import HwcModuleException
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import are_different_dicts
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import navigate_value
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import is_empty_value
+from ansible_collections.hwceco.hwcollection.plugins.module_utils.hwc_utils import wait_to_finish
+
 
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcce.v3 import *
@@ -559,7 +560,7 @@ class HwcCceCluster(HwcModuleBase):
             r = None
             try:
                 request = ShowJobRequest(job_id)
-                self.log('show job request body: %s' %request)
+                self.log('show job request body: %s' % request)
                 response = self.cce_client.show_job(request)
                 self.log('show job response body: %s' % response)
             except exceptions.ClientRequestException as e:
@@ -580,7 +581,7 @@ class HwcCceCluster(HwcModuleBase):
                 _query_status, timeout)
         except Exception as ex:
             self.module.fail_json(msg="module(hwc_cce_cluster): error "
-                                "waiting to be done, error= %s" % str(ex))
+                                  "waiting to be done, error= %s" % str(ex))
 
 
 def user_input_parameters(module):
@@ -599,7 +600,8 @@ def user_input_parameters(module):
         "eni_subnet_id": module.params.get("eni_subnet_id"),
         "eni_subnet_cidr": module.params.get("eni_subnet_cidr"),
         "authentication_mode": module.params.get("authentication_mode"),
-        "authenticating_proxy_ca": module.params.get("authenticating_proxy_ca"),
+        "authenticating_proxy_ca":
+            module.params.get("authenticating_proxy_ca"),
         "multi_az": module.params.get("multi_az"),
         "eip": module.params.get("eip"),
         "kube_proxy_mode": module.params.get("kube_proxy_mode"),
@@ -732,6 +734,7 @@ def expand_create_eni_network(d, array_index):
 
     return r
 
+
 def expand_create_authentication(d, array_index):
     r = dict()
 
@@ -744,6 +747,7 @@ def expand_create_authentication(d, array_index):
         r["authenticatingProxy"] = {"ca": v}
 
     return r
+
 
 def expand_create_extendparam(d, array_index):
     r = dict()
@@ -840,7 +844,7 @@ def fill_read_resp_spec(value):
 
     v = fill_read_resp_host_network(value.get("hostNetwork"))
     result["hostNetwork"] = v
-    
+
     v = fill_read_resp_container_network(value.get("containerNetwork"))
     result["containerNetwork"] = v
 
@@ -931,34 +935,44 @@ def flatten_options(response, array_index):
     v = navigate_value(response, ["read", "spec", "description"], array_index)
     r["description"] = v
 
-    v = navigate_value(response, ["read", "spec", "hostNetwork", "vpc"], array_index)
+    v = navigate_value(response, ["read", "spec", "hostNetwork", "vpc"],
+                       array_index)
     r["vpc_id"] = v
 
-    v = navigate_value(response, ["read", "spec", "hostNetwork", "subnet"], array_index)
+    v = navigate_value(response, ["read", "spec", "hostNetwork", "subnet"],
+                       array_index)
     r["subnet_id"] = v
 
-    v = navigate_value(response, ["read", "spec", "containerNetwork", "mode"], array_index)
+    v = navigate_value(response, ["read", "spec", "containerNetwork", "mode"],
+                       array_index)
     r["container_network_type"] = v
 
-    v = navigate_value(response, ["read", "spec", "containerNetwork", "cidr"], array_index)
+    v = navigate_value(response, ["read", "spec", "containerNetwork", "cidr"],
+                       array_index)
     r["container_network_cidr"] = v
 
-    v = navigate_value(response, ["read", "spec", "kubernetesSvcIpRange"], array_index)
+    v = navigate_value(response, ["read", "spec", "kubernetesSvcIpRange"],
+                       array_index)
     r["service_network_cidr"] = v
 
-    v = navigate_value(response, ["read", "spec", "eniNetwork", "eniSubnetId"], array_index)
+    v = navigate_value(response, ["read", "spec", "eniNetwork", "eniSubnetId"],
+                       array_index)
     r["eni_subnet_id"] = v
 
-    v = navigate_value(response, ["read", "spec", "eniNetwork", "eniSubnetCIDR"], array_index)
+    v = navigate_value(response, ["read", "spec", "eniNetwork",
+                                  "eniSubnetCIDR"], array_index)
     r["eni_subnet_cidr"] = v
 
-    v = navigate_value(response, ["read", "spec", "authentication", "mode"], array_index)
+    v = navigate_value(response, ["read", "spec", "authentication", "mode"],
+                       array_index)
     r["authentication_mode"] = v
 
-    v = navigate_value(response, ["read", "spec", "authentication", "authenticatingProxy"], array_index)
+    v = navigate_value(response, ["read", "spec", "authentication",
+                       "authenticatingProxy"], array_index)
     r["authenticating_proxy_ca"] = v
 
-    v = navigate_value(response, ["read", "spec", "kubeProxyMode"], array_index)
+    v = navigate_value(response, ["read", "spec", "kubeProxyMode"],
+                       array_index)
     r["kube_proxy_mode"] = v
 
     v = navigate_value(response, ["read", "spec", "extendParam"], array_index)
@@ -1083,6 +1097,7 @@ def expand_list_eni_network(d, array_index):
 
     return r
 
+
 def expand_list_authentication(d, array_index):
     r = dict()
 
@@ -1095,6 +1110,7 @@ def expand_list_authentication(d, array_index):
         r["authenticatingProxy"] = {"ca": v}
 
     return r
+
 
 def fill_list_resp_body(body):
     result = dict()
@@ -1131,11 +1147,10 @@ def fill_list_resp_spec(value):
     result["flavor"] = value.get("flavor")
     result["version"] = value.get("version")
     result["description"] = value.get("description")
-    
 
     v = fill_list_resp_host_network(value.get("hostNetwork"))
     result["hostNetwork"] = v
-    
+
     v = fill_list_resp_container_network(value.get("containerNetwork"))
     result["containerNetwork"] = v
 
@@ -1148,7 +1163,7 @@ def fill_list_resp_spec(value):
     result["extendParam"] = value.get("extendParam")
 
     result["kubernetesSvcIpRange"] = value.get("kubernetesSvcIpRange")
-  
+
     result["kubeProxyMode"] = value.get("kubeProxyMode")
 
     return result
