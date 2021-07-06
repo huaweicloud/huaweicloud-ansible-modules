@@ -9,7 +9,7 @@ namespace: hwceco
 name: hwcollection
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 1.0.1
+version: 1.0.3
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -45,7 +45,7 @@ tags: ["huawei", "cloud", "hwc", "development", "networking"]
 dependencies: {}
 
 # The URL of the originating SCM repository
-repository: http://example.com/repository
+repository: https://github.com/huaweicloud/huaweicloud-ansible-modules
 
 # The URL to any online docs
 documentation: http://docs.example.com
