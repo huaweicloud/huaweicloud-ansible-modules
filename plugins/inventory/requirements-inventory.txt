@@ -1,7 +1,0 @@
-ansible==4.2.0
-ansible-core==2.11.2
-configparser==5.0.2
-huaweicloudsdkcore==3.0.50
-huaweicloudsdkecs==3.0.50
-PyYAML==5.4.1
-urllib3==1.26.6
