@@ -158,13 +158,13 @@ options:
     kube_proxy_mode:
         description:
             - Specifies the service forwarding mode.
-            - iptables: Traditional kube-proxy uses iptables rules to implement service load balancing.
+            - "iptables: Traditional kube-proxy uses iptables rules to implement service load balancing.
               In this mode, too many iptables rules will be generated when many services are deployed.
               In addition, non-incremental updates will cause a latency and even obvious performance issues
-              in the case of heavy service traffic.
-            - ipvs: Optimized kube-proxy mode with higher throughput and faster speed.
+              in the case of heavy service traffic."
+            - "ipvs: Optimized kube-proxy mode with higher throughput and faster speed.
               This mode supports incremental updates and can keep connections uninterrupted during service updates.
-              It is suitable for large-sized clusters.
+              It is suitable for large-sized clusters."
         type: str
         required: false
     extend_param:
@@ -172,12 +172,13 @@ options:
             - Specifies the extended parameter. 
         type: dict
         required: false
-    enterprise_project_id
+    enterprise_project_id:
         description:
             - Specifies enterprise project id of the cce cluster.
         type: dict
         required: false
-extends_documentation_fragment: hwc
+extends_documentation_fragment:
+  - hwceco.hwcollection.hwc_auth_options
 '''
 
 EXAMPLES = '''
@@ -321,13 +322,13 @@ RETURN = '''
     kube_proxy_mode:
         description:
             - Specifies the service forwarding mode.
-            - iptables: Traditional kube-proxy uses iptables rules to implement service load balancing.
+            - "iptables: Traditional kube-proxy uses iptables rules to implement service load balancing.
               In this mode, too many iptables rules will be generated when many services are deployed.
               In addition, non-incremental updates will cause a latency and even obvious performance issues
-              in the case of heavy service traffic.
-            - ipvs: Optimized kube-proxy mode with higher throughput and faster speed.
+              in the case of heavy service traffic."
+            - "ipvs: Optimized kube-proxy mode with higher throughput and faster speed.
               This mode supports incremental updates and can keep connections uninterrupted during service updates.
-              It is suitable for large-sized clusters.
+              It is suitable for large-sized clusters."
         type: str
         returned: success
     extend_param:
@@ -335,7 +336,7 @@ RETURN = '''
             - Specifies the extended parameter. 
         type: dict
         returned: success
-    enterprise_project_id
+    enterprise_project_id:
         description:
             - Specifies enterprise project id of the cce cluster.
         type: dict

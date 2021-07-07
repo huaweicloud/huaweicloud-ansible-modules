@@ -109,25 +109,26 @@ options:
             - Specifies the key/value pairs to associate with the subnet.
         type: dict
         required: false
-extends_documentation_fragment: hwc
+extends_documentation_fragment:
+  - hwceco.hwcollection.hwc_auth_options
 '''
 
 EXAMPLES = '''
 # create subnet
 - name: create vpc
   hwc_vpc:
-    cidr: "192.168.100.0/24"
-    name: "ansible_network_vpc_test"
+      cidr: "192.168.100.0/24"
+      name: "ansible_network_vpc_test"
   register: vpc
 - name: create subnet
   hwc_vpc_subnet:
-    filters:
-      - "name"
-    vpc_id: "{{ vpc.state.id }}"
-    cidr: "192.168.100.0/26"
-    gateway_ip: "192.168.100.32"
-    name: "ansible_network_subnet_test"
-    dhcp_enable: True
+      filters:
+          - "name"
+      vpc_id: "{{ vpc.state.id }}"
+      cidr: "192.168.100.0/26"
+      gateway_ip: "192.168.100.32"
+      name: "ansible_network_subnet_test"
+      dhcp_enable: True
 '''
 
 RETURN = '''
@@ -173,7 +174,7 @@ RETURN = '''
         returned: success
     dns_address:
         description:
-            - Specifies the DNS server addresses for subnet. Note: the address
+            - Specifies the DNS server addresses for subnet. Note that the address
               in the head will be used first.
         type: list
         returned: success

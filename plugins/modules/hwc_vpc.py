@@ -30,7 +30,7 @@ requirements:
 options:
     state:
         description:
-            - Whether the given object should exist in vpc
+            - Whether the given object should exist in Huawei Cloud.
         type: str
         choices: ['present', 'absent']
         default: 'present'
@@ -48,7 +48,7 @@ options:
         description:
             - Specifies the description of the vpc.
         type: str
-        required: true
+        required: false
     enterprise_project_id:
         description:
             - Specifies the enterprise project id of the vpc.
@@ -59,7 +59,8 @@ options:
             - Specifies the key/value pairs to associate with the vpc.
         type: dict
         required: false
-extends_documentation_fragment: hwc
+extends_documentation_fragment:
+  - hwceco.hwcollection.hwc_auth_options
 '''
 
 EXAMPLES = '''

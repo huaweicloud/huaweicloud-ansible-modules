@@ -77,9 +77,9 @@ options:
         required: true
     name:
         description:
-            - Specifies the ECS name. "Value requirements: Consists of 1 to 64
+            - "Specifies the ECS name. Value requirements: Consists of 1 to 64
               characters, including letters, digits, underscores C(_), hyphens
-              (-), periods (.)".
+              (-), periods (.)."
         type: str
         required: true
     nics:
@@ -218,17 +218,18 @@ options:
         required: false
     user_data:
         description:
-            - Specifies the user data to be injected during the ECS creation
+            - "Specifies the user data to be injected during the ECS creation
               process. Text, text files, and gzip files can be injected.
               The content to be injected must be encoded with
               base64. The maximum size of the content to be injected (before
               encoding) is 32 KB. For Linux ECSs, this parameter does not take
               effect when adminPass is used. Examples are provided as follows
-              "Linux #! /bin/bash echo user_test &gt;&gt; /home/user.txt Windows
-              rem cmd echo 111 &gt; c:\\aaa.tx".
+              'Linux #! /bin/bash echo user_test &gt;&gt; /home/user.txt Windows
+              rem cmd echo 111 &gt; c:\\aaa.tx.'"
         type: str
         required: false
-extends_documentation_fragment: hwc
+extends_documentation_fragment:
+  - hwceco.hwcollection.hwc_auth_options
 '''
 
 EXAMPLES = '''
@@ -463,13 +464,13 @@ RETURN = '''
         returned: success
     user_data:
         description:
-            - Specifies the user data to be injected during the ECS creation
+            - "Specifies the user data to be injected during the ECS creation
               process. Text, text files, and gzip files can be injected.
               The content to be injected must be encoded with base64. The maximum
               size of the content to be injected (before encoding) is 32 KB. For
               Linux ECSs, this parameter does not take effect when adminPass is
-              used. Examples are provided as follows "Linux #! /bin/bash echo user_test
-              &gt;&gt; /home/user.txt Windows rem cmd echo 111 &gt; c:\\aaa.tx".
+              used. Examples are provided as follows 'Linux #! /bin/bash echo user_test
+              &gt;&gt; /home/user.txt Windows rem cmd echo 111 &gt; c:\\aaa.tx'."
         type: str
         returned: success
     config_drive:

@@ -69,15 +69,15 @@ options:
         required: true
     volume_type:
         description:
-            - Specifies the disk type. Currently, the value can be SSD, SAS, or
-              SATA.
-            - SSD: specifies the ultra-high I/O disk type.
-            - SAS: specifies the high I/O disk type.
-            - SATA: specifies the common I/O disk type.
-            - NOTE: If the specified disk type is not available in the AZ, the
-              disk will fail to create. If the EVS disk is created from a
-              snapshot, the volume_type field must be the same as that of the
-              snapshot's source disk.
+            - "Specifies the disk type. Currently, the value can be SSD, SAS, or
+               SATA."
+            - "SSD: specifies the ultra-high I/O disk type."
+            - "SAS: specifies the high I/O disk type."
+            - "SATA: specifies the common I/O disk type."
+            - "NOTE: If the specified disk type is not available in the AZ, the
+               disk will fail to create. If the EVS disk is created from a
+               snapshot, the volume_type field must be the same as that of the
+               snapshot's source disk."
         required: true
     backup_id:
         description:
@@ -103,10 +103,10 @@ options:
               media. SCSI reservation command is supported. If this parameter
               is set to False, the disk device type will be VBD, which supports
               only simple SCSI read/write commands.
-            - NOTE: If parameter enable_share is set to True and this parameter
-              is not specified, shared SCSI disks are created. SCSI EVS disks
-              cannot be created from backups, which means that this parameter
-              cannot be True if backup_id has been specified.
+            - 'NOTE: If parameter enable_share is set to True and this parameter
+               is not specified, shared SCSI disks are created. SCSI EVS disks
+               cannot be created from backups, which means that this parameter
+               cannot be True if backup_id has been specified.'
         type: bool
         required: false
     enable_share:
@@ -128,26 +128,27 @@ options:
     image_id:
         description:
             - Specifies the image ID. If this parameter is specified, the disk
-              is created from an image. NOTE: BMS system disks cannot be
-              created from BMS images.
+              is created from an image.
+            - 'NOTE: BMS system disks cannot be created from BMS images.'
         required: false
     size:
         description:
-            - Specifies the disk size, in GB. Its values are as follows: System
-              disk: 1 GB to 1024 GB, Data disk: 10 GB to 32768 GB. This
-              parameter is mandatory when you create an empty disk or use an
-              image or a snapshot to create a disk. If you use an image or a
-              snapshot to create a disk, the disk size must be greater than or
-              equal to the image or snapshot size. This parameter is optional
-              when you use a backup to create a disk. If this parameter is not
-              specified, the disk size is equal to the backup size.
+            - 'Specifies the disk size, in GB. Its values are as follows: System
+               disk: 1 GB to 1024 GB, Data disk: 10 GB to 32768 GB. This
+               parameter is mandatory when you create an empty disk or use an
+               image or a snapshot to create a disk. If you use an image or a
+               snapshot to create a disk, the disk size must be greater than or
+               equal to the image or snapshot size. This parameter is optional
+               when you use a backup to create a disk. If this parameter is not
+               specified, the disk size is equal to the backup size.'
         required: false
     snapshot_id:
         description:
             - Specifies the snapshot ID. If this parameter is specified, the
               disk is created from a snapshot.
         required: false
-extends_documentation_fragment: hwc
+extends_documentation_fragment:
+  - hwceco.hwcollection.hwc_auth_options
 '''
 
 EXAMPLES = '''
@@ -176,15 +177,15 @@ RETURN = '''
         returned: success
     volume_type:
         description:
-            - Specifies the disk type. Currently, the value can be SSD, SAS, or
-              SATA.
-            - SSD: specifies the ultra-high I/O disk type.
-            - SAS: specifies the high I/O disk type.
-            - SATA: specifies the common I/O disk type.
-            - NOTE: If the specified disk type is not available in the AZ, the
-              disk will fail to create. If the EVS disk is created from a
-              snapshot, the volume_type field must be the same as that of the
-              snapshot's source disk.
+            - "Specifies the disk type. Currently, the value can be SSD, SAS, or
+              SATA."
+            - "SSD: specifies the ultra-high I/O disk type."
+            - "SAS: specifies the high I/O disk type."
+            - "SATA: specifies the common I/O disk type."
+            - "NOTE: If the specified disk type is not available in the AZ, the
+               disk will fail to create. If the EVS disk is created from a
+               snapshot, the volume_type field must be the same as that of the
+               snapshot's source disk."
         type: str
         returned: success
     backup_id:
@@ -213,10 +214,10 @@ RETURN = '''
               media. SCSI reservation command is supported. If this parameter
               is set to False, the disk device type will be VBD, which supports
               only simple SCSI read/write commands.
-            - NOTE: If parameter enable_share is set to True and this parameter
-              is not specified, shared SCSI disks are created. SCSI EVS disks
-              cannot be created from backups, which means that this parameter
-              cannot be True if backup_id has been specified.
+            - "NOTE: If parameter enable_share is set to True and this parameter
+               is not specified, shared SCSI disks are created. SCSI EVS disks
+               cannot be created from backups, which means that this parameter
+               cannot be True if backup_id has been specified."
         type: bool
         returned: success
     enable_share:
@@ -239,21 +240,21 @@ RETURN = '''
         returned: success
     image_id:
         description:
-            - Specifies the image ID. If this parameter is specified, the disk
-              is created from an image. NOTE: BMS system disks cannot be
-              created from BMS images.
+            - "Specifies the image ID. If this parameter is specified, the disk
+               is created from an image. NOTE: BMS system disks cannot be
+               created from BMS images."
         type: str
         returned: success
     size:
         description:
-            - Specifies the disk size, in GB. Its values are as follows: System
-              disk: 1 GB to 1024 GB, Data disk: 10 GB to 32768 GB. This
-              parameter is mandatory when you create an empty disk or use an
-              image or a snapshot to create a disk. If you use an image or a
-              snapshot to create a disk, the disk size must be greater than or
-              equal to the image or snapshot size. This parameter is optional
-              when you use a backup to create a disk. If this parameter is not
-              specified, the disk size is equal to the backup size.
+            - "Specifies the disk size, in GB. Its values are as follows: System
+               disk: 1 GB to 1024 GB, Data disk: 10 GB to 32768 GB. This
+               parameter is mandatory when you create an empty disk or use an
+               image or a snapshot to create a disk. If you use an image or a
+               snapshot to create a disk, the disk size must be greater than or
+               equal to the image or snapshot size. This parameter is optional
+               when you use a backup to create a disk. If this parameter is not
+               specified, the disk size is equal to the backup size."
         type: int
         returned: success
     snapshot_id:
@@ -270,8 +271,8 @@ RETURN = '''
         contains:
             attached_at:
                 description:
-                    - Specifies the time when the disk was attached. Time
-                      format: UTC YYYY-MM-DDTHH:MM:SS.
+                    - 'Specifies the time when the disk was attached. Time
+                       format: UTC YYYY-MM-DDTHH:MM:SS.'
                 type: str
                 returned: success
             attachment_id:
@@ -297,8 +298,8 @@ RETURN = '''
         returned: success
     created_at:
         description:
-            - Specifies the time when the disk was created. Time format: UTC
-              YYYY-MM-DDTHH:MM:SS.
+            - 'Specifies the time when the disk was created. Time format: UTC
+               YYYY-MM-DDTHH:MM:SS.'
         type: str
         returned: success
     is_bootable:
@@ -308,9 +309,9 @@ RETURN = '''
         returned: success
     is_readonly:
         description:
-            - Specifies whether the disk is read-only or read/write. True:
-              indicates that the disk is read-only. False: indicates that the
-              disk is read/write.
+            - 'Specifies whether the disk is read-only or read/write. True:
+               indicates that the disk is read-only. False: indicates that the
+               disk is read/write.'
         type: bool
         returned: success
     source_volume_id:

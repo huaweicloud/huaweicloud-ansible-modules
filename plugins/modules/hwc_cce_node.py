@@ -73,9 +73,9 @@ options:
         required: true
     name:
         description:
-            - Specifies the node name. "Value requirements: Consists of 1 to 64
+            - "Specifies the node name. Value requirements: Consists of 1 to 64
               characters, including letters, digits, hyphens
-              (-), periods (.)".
+              (-), periods (.)."
         type: str
         required: false
     os:
@@ -171,14 +171,17 @@ options:
         type: str
         required: false
     extend_param:
+        description:
             - Specifies the extend parameter of the node, key/value pair format.
         type: dict
         required: false
     tags:
+        description:
             - Specifies the tags of the node, key/value pair format.
         type: dict
         required: false
     k8s_tags:
+        description:
             - Specifies the tags of the kubernetes node, key/value pair format.
         type: dict
         required: false
@@ -206,7 +209,8 @@ options:
                     - Available options are NoSchedule, PreferNoSchedule, and NoExecute.
                 type: int
                 required: true
-extends_documentation_fragment: hwc
+extends_documentation_fragment:
+  - hwceco.hwcollection.hwc_auth_options
 '''
 
 EXAMPLES = '''
@@ -283,9 +287,9 @@ RETURN = '''
         returned: success
     name:
         description:
-            - Specifies the node name. "Value requirements: Consists of 1 to 64
+            - "Specifies the node name. Value requirements: Consists of 1 to 64
               characters, including letters, digits, hyphens
-              (-), periods (.)".
+              (-), periods (.)."
         type: str
         returned: success
     os:
@@ -381,14 +385,17 @@ RETURN = '''
         type: str
         returned: success
     extend_param:
+        description:
             - Specifies the extend parameter of the node, key/value pair format.
         type: dict
         returned: success
     tags:
+        description:
             - Specifies the tags of the node, key/value pair format.
         type: dict
         returned: success
     k8s_tags:
+        description:
             - Specifies the tags of the kubernetes node, key/value pair format.
         type: dict
         returned: success
