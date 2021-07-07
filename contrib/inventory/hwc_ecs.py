@@ -178,6 +178,7 @@ class EcsInventory(object):
 
         # Configure which groups should be created.
         group_by_options = [
+            'group_by_instance_name',
             'group_by_instance_id',
             'group_by_region',
             'group_by_availability_zone',
@@ -351,7 +352,13 @@ class EcsInventory(object):
         if self.group_by_instance_id:
             self.push(self.inventory, instance['id'], hostname)
             if self.nested_groups:
-                self.push_group(self.inventory, 'instances', instance['id'])
+                self.push_group(self.inventory, 'instances_by_id', instance['id'])
+
+        # Inventory: Group by instance name (always a group of 1)
+        if self.group_by_instance_name:
+            self.push(self.inventory, instance['name'], hostname)
+            if self.nested_groups:
+                self.push_group(self.inventory, 'instances_by_name', instance['name'])
 
         # Inventory: Group by region
         if self.group_by_region:
