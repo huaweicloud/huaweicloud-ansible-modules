@@ -40,8 +40,6 @@ Example Playbook
       tasks:
 		- name: create a new vpc
 		  hwc_vpc:
-			identity_endpoint: "https://iam.cn-north-1.myhwclouds.com/v3"
-			cloud: "myhwclouds.com"
 			access_key: "{{ access_key }}"
 			secret_key: "{{ secret_key }}"
 			project_id: "{{ project_id }}"
