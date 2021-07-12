@@ -10,7 +10,7 @@ __metaclass__ = type
 
 class ModuleDocFragment(object):
 
-    # Azure doc fragment
+    # Huaweicloud doc fragment
     DOCUMENTATION = r'''
     options:
         access_key:
