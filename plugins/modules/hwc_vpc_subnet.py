@@ -20,10 +20,10 @@ DOCUMENTATION = '''
 ---
 module: hwc_vpc_subnet
 description:
-    - subnet management.
+    - Creates and manages a resource of Vpc/Subnet in Huawei Cloud.
 short_description: Creates a resource of Vpc/Subnet in Huawei Cloud
-version_added: '2.9'
-author: Huawei Inc. (@huaweicloud)
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
     - huaweicloudsdkcore >= 3.0.47
     - huaweicloudsdkvpc >= 3.0.47
@@ -90,13 +90,13 @@ options:
         description:
             - Specifies whether DHCP is enabled for the subnet.
         type: bool
-        default: 'true'
+        default: 'yes'
         required: false
     ipv6_enable:
         description:
             - Specifies whether the IPv6 function is enabled for the subnet.
         type: bool
-        default: 'false'
+        default: 'no'
         required: false
     dns_address:
         description:

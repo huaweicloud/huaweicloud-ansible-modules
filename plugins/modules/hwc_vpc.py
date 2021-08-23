@@ -20,10 +20,10 @@ DOCUMENTATION = '''
 ---
 module: hwc_vpc
 description:
-    - Represents an vpc resource.
+    - Creates and manages a Huawei Cloud VPC.
 short_description: Creates a Huawei Cloud VPC
-version_added: '2.8'
-author: Huawei Inc. (@huaweicloud)
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
     - huaweicloudsdkcore >= 3.0.47
     - huaweicloudsdkvpc >= 3.0.47
@@ -105,7 +105,7 @@ RETURN = '''
     routes:
         description:
             - the route information.
-        type: complex
+        type: dict
         returned: success
         contains:
             destination:

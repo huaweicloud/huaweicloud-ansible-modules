@@ -20,10 +20,10 @@ DOCUMENTATION = '''
 ---
 module: hwc_cce_cluster
 description:
-    - instance management.
+    - Creates and manages a resource of cce cluster in Huawei Cloud.
 short_description: Creates a resource of cce cluster in Huawei Cloud
-version_added: '2.9'
-author: Huawei Inc. (@huaweicloud)
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
     - huaweicloudsdkcore >= 3.0.47
     - huaweicloudsdkcce >= 3.0.47
@@ -251,7 +251,6 @@ RETURN = '''
         description:
             - Specifies the cluster type, possible values are VirtualMachine, BareMetal and ARM64.
         type: str
-        default: 'VirtualMachine'
         returned: success
     description:
         description:
@@ -300,7 +299,6 @@ RETURN = '''
             - Specifies the Authentication mode of the cluster,
               possible values are x509 and rbac.
         type: str
-        default: 'rbac'
         returned: success
     authenticating_proxy_ca:
         description:
@@ -339,7 +337,7 @@ RETURN = '''
     enterprise_project_id:
         description:
             - Specifies enterprise project id of the cce cluster.
-        type: dict
+        type: str
         returned: success
     status:
         description:
