@@ -20,12 +20,13 @@ DOCUMENTATION = '''
 ---
 module: hwc_ecs_instance
 description:
-    - instance management.
+    - Creates and manages a resource of Ecs/Instance in Huawei Cloud
 short_description: Creates a resource of Ecs/Instance in Huawei Cloud
-version_added: '2.9'
-author: Huawei Inc. (@huaweicloud)
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
-    - keystoneauth1 >= 3.6.0
+    - huaweicloudsdkcore >= 3.0.47
+    - huaweicloudsdkecs >= 3.0.47
 options:
     state:
         description:
@@ -87,7 +88,8 @@ options:
             - Specifies the NIC information of the ECS. Constraints the
               network of the NIC must belong to the VPC specified by vpc_id. A
               maximum of 12 NICs can be attached to an ECS.
-        type: complex
+        type: list
+        elements: dict
         required: true
         suboptions:
             ip_address:
@@ -105,7 +107,7 @@ options:
     root_volume:
         description:
             - Specifies the configuration of the ECS's system disks.
-        type: complex
+        type: dict
         required: true
         suboptions:
             volume_type:
@@ -160,7 +162,8 @@ options:
     data_volumes:
         description:
             - Specifies the data disks of ECS instance.
-        type: complex
+        type: list
+        elements: dict
         required: false
         suboptions:
             volume_id:
@@ -244,7 +247,7 @@ EXAMPLES = '''
     gateway_ip: "192.168.100.32"
     name: "ansible_network_subnet_test"
     dhcp_enable: true
-    vpc_id: "{{ vpc.id }}"
+    vpc_id: "{{ vpc.state.id }}"
     filters:
       - "name"
     cidr: "192.168.100.0/26"
@@ -272,14 +275,14 @@ EXAMPLES = '''
 - name: create an instance
   hwc_ecs_instance:
     data_volumes:
-      - volume_id: "{{ disk.id }}"
-    eip_id: "{{ eip.id }}"
+      - volume_id: "{{ disk.state.id }}"
+    eip_id: "{{ eip.state.id }}"
     name: "ansible_ecs_instance_test"
     availability_zone: "cn-north-1a"
     nics:
-      - subnet_id: "{{ subnet.id }}"
+      - subnet_id: "{{ subnet.state.id }}"
         ip_address: "192.168.100.33"
-      - subnet_id: "{{ subnet.id }}"
+      - subnet_id: "{{ subnet.state.id }}"
         ip_address: "192.168.100.34"
     server_tags:
       my_server: "my_server"
@@ -287,7 +290,7 @@ EXAMPLES = '''
     flavor_name: "s3.small.1"
     filters:
       - "name"
-    vpc_id: "{{ vpc.id }}"
+    vpc_id: "{{ vpc.state.id }}"
     root_volume:
       volume_type: "SAS"
 '''
@@ -320,7 +323,8 @@ RETURN = '''
             - Specifies the NIC information of the ECS. The
               network of the NIC must belong to the VPC specified by vpc_id. A
               maximum of 12 NICs can be attached to an ECS.
-        type: complex
+        type: list
+        elements: dict
         returned: success
         contains:
             ip_address:
@@ -343,7 +347,7 @@ RETURN = '''
     root_volume:
         description:
             - Specifies the configuration of the ECS's system disks.
-        type: complex
+        type: dict
         returned: success
         contains:
             volume_type:
@@ -408,7 +412,8 @@ RETURN = '''
     data_volumes:
         description:
             - Specifies the data disks of ECS instance.
-        type: complex
+        type: list
+        elements: dict
         returned: success
         contains:
             volume_id:

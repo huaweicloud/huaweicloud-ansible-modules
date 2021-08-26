@@ -20,10 +20,10 @@ DOCUMENTATION = '''
 ---
 module: hwc_cce_node
 description:
-    - instance management.
-short_description: Creates a resource of cce node in Huawei Cloud
-version_added: '2.9'
-author: Huawei Inc. (@huaweicloud)
+    - Creates and manages a resource of CCE/Node in Huawei Cloud
+short_description: Creates a resource of CCE/Node in Huawei Cloud
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
     - huaweicloudsdkcore >= 3.0.47
     - huaweicloudsdkcce >= 3.0.47
@@ -96,7 +96,7 @@ options:
     root_volume:
         description:
             - Specifies the system disk of the node.
-        type: complex
+        type: dict
         required: true
         suboptions:
             volume_type:
@@ -116,7 +116,8 @@ options:
     data_volumes:
         description:
             - Specifies the data disks of the node.
-        type: complex
+        type: list
+        elements: dict
         required: true
         suboptions:
             volume_type:
@@ -188,7 +189,8 @@ options:
     taints:
         description:
             - You can add taints to created nodes to configure anti-affinity.
-        type: complex
+        type: list
+        elements: dict
         required: false
         suboptions:
             key:
@@ -202,12 +204,12 @@ options:
                 description:
                     - A value must start with a letter or digit and can contain a maximum of 63 characters,
                       including letters, digits, hyphens (-), underscores (_), and periods (.).
-                type: int
+                type: str
                 required: true
             effect:
                 description:
                     - Available options are NoSchedule, PreferNoSchedule, and NoExecute.
-                type: int
+                type: str
                 required: true
 extends_documentation_fragment:
   - hwceco.hwcollection.hwc_auth_options
@@ -310,9 +312,9 @@ RETURN = '''
     root_volume:
         description:
             - Specifies the system disk of the node.
-        type: complex
+        type: dict
         returned: success
-        suboptions:
+        contains:
             volume_type:
                 description:
                     - Specifies the disk type.
@@ -330,9 +332,10 @@ RETURN = '''
     data_volumes:
         description:
             - Specifies the data disks of the node.
-        type: complex
+        type: list
+        elements: dict
         returned: success
-        suboptions:
+        contains:
             volume_type:
                 description:
                     - Specifies the disk type.
@@ -402,9 +405,10 @@ RETURN = '''
     taints:
         description:
             - You can add taints to created nodes to configure anti-affinity.
-        type: complex
+        type: list
+        elements: dict
         returned: success
-        suboptions:
+        contains:
             key:
                 description:
                     - A key must contain 1 to 63 characters starting with a letter or digit.

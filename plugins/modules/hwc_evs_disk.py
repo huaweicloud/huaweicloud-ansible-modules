@@ -20,12 +20,13 @@ DOCUMENTATION = '''
 ---
 module: hwc_evs_disk
 description:
-    - block storage management.
+    - Creates and manages a resource of Evs/Disk in Huawei Cloud.
 short_description: Creates a resource of Evs/Disk in Huawei Cloud
-version_added: '2.9'
-author: Huawei Inc. (@huaweicloud)
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
-    - keystoneauth1 >= 3.6.0
+    - huaweicloudsdkcore >= 3.0.47
+    - huaweicloudsdkevs >= 3.0.47
 options:
     state:
         description:
@@ -266,7 +267,7 @@ RETURN = '''
     attachments:
         description:
             - Specifies the disk attachment information.
-        type: complex
+        type: dict
         returned: success
         contains:
             attached_at:

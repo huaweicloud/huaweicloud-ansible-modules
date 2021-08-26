@@ -20,10 +20,10 @@ DOCUMENTATION = '''
 ---
 module: hwc_vpc_security_group_rule
 description:
-    - vpc security group management.
+    - Creates and manages a resource of Vpc/SecurityGroupRule in Huawei Cloud.
 short_description: Creates a resource of Vpc/SecurityGroupRule in Huawei Cloud
-version_added: '2.9'
-author: Huawei Inc. (@huaweicloud)
+version_added: '1.0.0'
+author: Huawei (@huaweicloud)
 requirements:
     - huaweicloudsdkcore >= 3.0.47
     - huaweicloudsdkvpc >= 3.0.47
